@@ -67,6 +67,34 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf) {
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   // LAB 2: Your code here.
+  uintptr_t rip, *rbp;
+
+  // Read current address and current stack frame
+  asm("movq %%rbp, %0\n"
+      "call label\n"
+      "label: popq %1\n"
+      : "=r"(rbp), "=r"(rip));
+
+  while (rbp) {
+    struct Ripdebuginfo info;
+    debuginfo_rip(rip, &info);
+
+    int nmlen = info.rip_fn_namelen;
+
+    // Cut off name if it is too long
+    if (nmlen > 255)
+      nmlen = 255;
+
+    // Make name NULL-terminated
+    info.rip_fn_name[nmlen] = '\0';
+    cprintf("rbp %016lx rip %016lx\n", (unsigned long)rbp, (unsigned long)rip);
+    cprintf("%s:%d: %s+0x%lx\n", info.rip_file, info.rip_line, info.rip_fn_name, rip - info.rip_fn_addr);
+
+    // Next stack frame
+    rip = rbp[1];
+    rbp = (uintptr_t *)rbp[0];
+  }
+
   return 0;
 }
 
