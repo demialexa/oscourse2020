@@ -12,6 +12,7 @@
 static bool graphics_exists = false;
 static uint32_t uefi_vres;
 static uint32_t uefi_hres;
+static uint32_t uefi_stride;
 static uint32_t crt_rows;
 static uint32_t crt_cols;
 static uint32_t crt_size;
@@ -32,13 +33,13 @@ delay(void) {
 
 #define COM1 0x3F8
 
-#define COM_RX        0    // In:	Receive buffer (DLAB=0)
+#define COM_RX        0    // In:   Receive buffer (DLAB=0)
 #define COM_TX        0    // Out: Transmit buffer (DLAB=0)
 #define COM_DLL       0    // Out: Divisor Latch Low (DLAB=1)
 #define COM_DLM       1    // Out: Divisor Latch High (DLAB=1)
 #define COM_IER       1    // Out: Interrupt Enable Register
 #define COM_IER_RDI   0x01 //   Enable receiver data interrupt
-#define COM_IIR       2    // In:	Interrupt ID Register
+#define COM_IIR       2    // In:   Interrupt ID Register
 #define COM_FCR       2    // Out: FIFO Control Register
 #define COM_LCR       3    // Out: Line Control Register
 #define COM_LCR_DLAB  0x80 //   Divisor latch access bit
@@ -47,7 +48,7 @@ delay(void) {
 #define COM_MCR_RTS   0x02 // RTS complement
 #define COM_MCR_DTR   0x01 // DTR complement
 #define COM_MCR_OUT2  0x08 // Out2 complement
-#define COM_LSR       5    // In:	Line Status Register
+#define COM_LSR       5    // In:   Line Status Register
 #define COM_LSR_DATA  0x01 //   Data available
 #define COM_LSR_TXRDY 0x20 //   Transmit buffer avail
 #define COM_LSR_TSRE  0x40 //   Transmitter off
@@ -192,7 +193,7 @@ draw_char(uint32_t *buffer, uint32_t x, uint32_t y, uint32_t color, char charcod
   for (int h = 0; h < 8; h++) {
     for (int w = 0; w < 8; w++) {
       if ((p[h] >> (w)) & 1) {
-        buffer[uefi_hres * SYMBOL_SIZE * y + uefi_hres * h + SYMBOL_SIZE * x + w] = color;
+        buffer[uefi_stride * SYMBOL_SIZE * y + uefi_stride * h + SYMBOL_SIZE * x + w] = color;
       }
     }
   }
@@ -273,6 +274,7 @@ fb_init(void) {
   LOADER_PARAMS *lp = (LOADER_PARAMS *)uefi_lp;
   uefi_vres         = lp->VerticalResolution;
   uefi_hres         = lp->HorizontalResolution;
+  uefi_stride       = lp->PixelsPerScanLine;
   crt_rows          = uefi_vres / SYMBOL_SIZE;
   crt_cols          = uefi_hres / SYMBOL_SIZE;
   crt_size          = crt_rows * crt_cols;
@@ -320,13 +322,14 @@ fb_putc(int c) {
       break;
   }
 
-  // What is the purpose of this?
+  // Scoll up when we have reached the bottom of screen
   if (crt_pos >= crt_size) {
-    int i;
+    memmove(crt_buf, crt_buf + uefi_stride * SYMBOL_SIZE,
+            uefi_stride * (uefi_vres - SYMBOL_SIZE) * sizeof(uint32_t));
 
-    memmove(crt_buf, crt_buf + uefi_hres * SYMBOL_SIZE, uefi_hres * (uefi_vres - SYMBOL_SIZE) * sizeof(uint32_t));
-    for (i = uefi_hres * (uefi_vres - (uefi_vres % SYMBOL_SIZE) - SYMBOL_SIZE); i < uefi_hres * uefi_vres; i++)
-      crt_buf[i] = 0;
+    int i = (uefi_vres - (uefi_vres % SYMBOL_SIZE) - SYMBOL_SIZE) * uefi_stride;
+    for (; i < uefi_stride * uefi_vres; i += uefi_stride)
+      for (int j = 0; j < uefi_hres; j++) crt_buf[i + j] = 0;
     crt_pos -= crt_cols;
   }
 }

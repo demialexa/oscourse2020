@@ -168,6 +168,7 @@ InitGraphics (
   //
   LoaderParams->FrameBufferBase      = GraphicsOutput->Mode->FrameBufferBase;
   LoaderParams->FrameBufferSize      = GraphicsOutput->Mode->FrameBufferSize;
+  LoaderParams->PixelsPerScanLine    = GraphicsOutput->Mode->Info->PixelsPerScanLine;
   LoaderParams->HorizontalResolution = GraphicsOutput->Mode->Info->HorizontalResolution;
   LoaderParams->VerticalResolution   = GraphicsOutput->Mode->Info->VerticalResolution;
 

@@ -32,6 +32,7 @@ typedef struct {
   ///
   EFI_PHYSICAL_ADDRESS     FrameBufferBase;
   UINT32                   FrameBufferSize;
+  UINT32                   PixelsPerScanLine;
   UINT32                   VerticalResolution;
   UINT32                   HorizontalResolution;
 
