@@ -114,6 +114,39 @@ InitGraphics (
   // Hint: Use GetMode/SetMode functions.
   //
 
+  UINT32 DesiredWidth = 1024U, DesiredHeight = 768U, MaxModIdx = -1U;
+  for (UINT32 i = 0; i < GraphicsOutput->Mode->MaxMode; i++) {
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *ModInfo;
+    UINTN ModInfoSz;
+
+    Status = GraphicsOutput->QueryMode(GraphicsOutput, i, &ModInfoSz, &ModInfo);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_WARN, "JOS: Cannot query graphics mode - %r\n", Status));
+      break;
+    }
+
+    // TODO: It would be better to be less picky when searching
+    // for video mode and just pass video mode information to
+    // the kernel as a part of LoaderParams. This should include
+    // PixelFormat, PixelInformation
+
+    if (ModInfo->HorizontalResolution == DesiredWidth &&
+        ModInfo->VerticalResolution == DesiredHeight &&
+        ModInfo->PixelFormat == PixelBlueGreenRedReserved8BitPerColor) {
+      MaxModIdx = i;
+      break;
+    }
+  }
+
+  if (MaxModIdx != -1U) {
+    Status = GraphicsOutput->SetMode(GraphicsOutput, MaxModIdx);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((DEBUG_WARN, "JOS: Cannot set graphics mode - %r\n", Status));
+    }
+  } else {
+    DEBUG ((DEBUG_WARN, "JOS: Cannot find graphics mode - %r\n"));
+  }
+
   //
   // Fill screen with black.
   //
