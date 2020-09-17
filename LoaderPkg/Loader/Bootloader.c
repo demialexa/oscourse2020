@@ -84,8 +84,19 @@ InitGraphics (
   OUT LOADER_PARAMS  *LoaderParams
   )
 {
+  enum {
+    hr = 1024,
+    vr = 768
+  };
+
   EFI_STATUS                    Status;
   EFI_GRAPHICS_OUTPUT_PROTOCOL  *GraphicsOutput;
+
+#if 1
+  UINT32 i = 0;
+  UINTN InfoBufferSize;
+  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *InfoBuffer;
+#endif
 
   ASSERT (LoaderParams != NULL);
 
@@ -114,6 +125,28 @@ InitGraphics (
   // Hint: Use GetMode/SetMode functions.
   //
 
+#if 1
+  InfoBufferSize = sizeof(*InfoBuffer);
+  InfoBuffer = AllocatePool(InfoBufferSize);
+  for (i=0; i<GraphicsOutput->Mode->MaxMode; i++) {
+    GraphicsOutput->QueryMode (GraphicsOutput, i, &InfoBufferSize, &InfoBuffer);
+	if (InfoBuffer->HorizontalResolution == hr &&
+	  InfoBuffer->VerticalResolution ==	vr
+	) {
+      Status = GraphicsOutput->SetMode (GraphicsOutput, i);
+	  if (EFI_ERROR(Status)) {
+		  DEBUG ((DEBUG_INFO, "Error setting resolution\n"));
+		  return Status;
+	  } else {
+		  DEBUG ((DEBUG_INFO, "Resolution: %ux%u\n", hr, vr));
+		  break;
+	  }
+	}
+  }
+  FreePool(InfoBuffer);
+#endif
+
+  // GraphicsOutput->SetMode(GraphicsOutput)
   //
   // Fill screen with black.
   //
@@ -968,7 +1001,7 @@ UefiMain (
   UINTN              EntryPoint;
   VOID               *GateData;
 
-#if 1 ///< Uncomment to await debugging
+#if 0 ///< Uncomment to await debugging
   volatile BOOLEAN   Connected;
   DEBUG ((DEBUG_INFO, "JOS: Awaiting debugger connection\n"));
 
