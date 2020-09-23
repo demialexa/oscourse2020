@@ -632,9 +632,11 @@ address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname,
     while (pubnames_entry < pubnames_entry_end) {
       func_offset = get_unaligned(pubnames_entry, uint32_t);
       pubnames_entry += sizeof(uint32_t);
+
       if (func_offset == 0) {
         break;
       }
+
       if (!strcmp(fname, pubnames_entry)) {
         // parse compilation unit header
         const void *entry      = addrs->info_begin + cu_offset;
@@ -693,6 +695,34 @@ address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname,
           // You can read unsigned LEB128 number using dwarf_read_uleb128 function.
           // Attribute value can be obtained using dwarf_read_abbrev_entry function.
           // LAB 3: Your code here:
+          uintptr_t low_pc = 0;
+          do {
+            count = dwarf_read_uleb128(abbrev_entry, &name);
+            abbrev_entry += count;
+            count = dwarf_read_uleb128(abbrev_entry, &form);
+            abbrev_entry += count;
+            if (name == DW_AT_low_pc) {
+              count = dwarf_read_abbrev_entry(entry, form, &low_pc, sizeof(low_pc), address_size);
+            } else {
+              count = dwarf_read_abbrev_entry(entry, form, NULL, 0, address_size);
+            }
+            entry += count;
+          } while (name || form);
+          *offset = low_pc;
+        } else {
+          // skip if not a subprogram or label
+          do {
+            count = dwarf_read_uleb128(
+                abbrev_entry, &name);
+            abbrev_entry += count;
+            count = dwarf_read_uleb128(
+                abbrev_entry, &form);
+            abbrev_entry += count;
+            count = dwarf_read_abbrev_entry(
+                entry, form, NULL, 0,
+                address_size);
+            entry += count;
+          } while (name != 0 || form != 0);
         }
         return 0;
       }
@@ -755,11 +785,9 @@ naive_address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname,
         }
         // skip attributes
         do {
-          count = dwarf_read_uleb128(
-              curr_abbrev_entry, &name);
+          count = dwarf_read_uleb128(curr_abbrev_entry, &name);
           curr_abbrev_entry += count;
-          count = dwarf_read_uleb128(
-              curr_abbrev_entry, &form);
+          count = dwarf_read_uleb128(curr_abbrev_entry, &form);
           curr_abbrev_entry += count;
         } while (name != 0 || form != 0);
       }
@@ -768,48 +796,27 @@ naive_address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname,
         uintptr_t low_pc = 0;
         int found        = 0;
         do {
-          count = dwarf_read_uleb128(
-              curr_abbrev_entry, &name);
+          count = dwarf_read_uleb128(curr_abbrev_entry, &name);
           curr_abbrev_entry += count;
-          count = dwarf_read_uleb128(
-              curr_abbrev_entry, &form);
+          count = dwarf_read_uleb128(curr_abbrev_entry, &form);
           curr_abbrev_entry += count;
           if (name == DW_AT_low_pc) {
-            count = dwarf_read_abbrev_entry(
-                entry, form, &low_pc,
-                sizeof(low_pc),
-                address_size);
+            count = dwarf_read_abbrev_entry(entry, form, &low_pc, sizeof(low_pc), address_size);
           } else if (name == DW_AT_name) {
             if (form == DW_FORM_strp) {
-              unsigned long
-                  str_offset = 0;
-              count          = dwarf_read_abbrev_entry(
-                  entry, form,
-                  &str_offset,
-                  sizeof(
-                      unsigned long),
-                  address_size);
-              if (!strcmp(
-                      fname,
-                      (const char
-                           *)addrs
-                              ->str_begin +
-                          str_offset)) {
+              unsigned long str_offset = 0;
+              count                    = dwarf_read_abbrev_entry(entry, form, &str_offset, sizeof(unsigned long), address_size);
+              if (!strcmp(fname, (const char *)addrs->str_begin + str_offset)) {
                 found = 1;
               }
             } else {
               if (!strcmp(fname, entry)) {
                 found = 1;
               }
-              count = dwarf_read_abbrev_entry(
-                  entry, form,
-                  NULL, 0,
-                  address_size);
+              count = dwarf_read_abbrev_entry(entry, form, NULL, 0, address_size);
             }
           } else {
-            count = dwarf_read_abbrev_entry(
-                entry, form, NULL, 0,
-                address_size);
+            count = dwarf_read_abbrev_entry(entry, form, NULL, 0, address_size);
           }
           entry += count;
         } while (name != 0 || form != 0);
@@ -821,15 +828,11 @@ naive_address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname,
       } else {
         // skip if not a subprogram or label
         do {
-          count = dwarf_read_uleb128(
-              curr_abbrev_entry, &name);
+          count = dwarf_read_uleb128(curr_abbrev_entry, &name);
           curr_abbrev_entry += count;
-          count = dwarf_read_uleb128(
-              curr_abbrev_entry, &form);
+          count = dwarf_read_uleb128(curr_abbrev_entry, &form);
           curr_abbrev_entry += count;
-          count = dwarf_read_abbrev_entry(
-              entry, form, NULL, 0,
-              address_size);
+          count = dwarf_read_abbrev_entry(entry, form, NULL, 0, address_size);
           entry += count;
         } while (name != 0 || form != 0);
       }
