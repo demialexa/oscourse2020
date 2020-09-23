@@ -127,6 +127,13 @@ void
 env_init(void) {
   // Set up envs array
   // LAB 3: Your code here.
+
+  env_free_list = NULL;
+  for (int i = NENV; i > 0; i--) {
+    envs[i - 1].env_link = env_free_list;
+    envs[i - 1].env_id   = 0;
+    env_free_list        = &envs[i - 1];
+  }
 }
 
 // Load GDT and segment descriptors.
@@ -158,8 +165,8 @@ env_init_percpu(void) {
 // On success, the new environment is stored in *newenv_store.
 //
 // Returns 0 on success, < 0 on failure.  Errors include:
-//	-E_NO_FREE_ENV if all NENVS environments are allocated
-//	-E_NO_MEM on memory exhaustion
+//  -E_NO_FREE_ENV if all NENVS environments are allocated
+//  -E_NO_MEM on memory exhaustion
 //
 int
 env_alloc(struct Env **newenv_store, envid_t parent_id) {
@@ -206,9 +213,21 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
   e->env_tf.tf_cs = GD_KT | 0;
 
   // LAB 3: Your code here.
-  // static int STACK_TOP = 0x2000000;
+  // Allocate stack for new task
+  static uintptr_t STACK_TOP = 0x2000000;
+  STACK_TOP -= 2 * PGSIZE;
+  e->env_tf.tf_rsp = STACK_TOP;
+
+  // For now init trapframe with current RFLAGS
+  e->env_tf.tf_rflags = read_rflags();
 #else
+  e->env_tf.tf_ds = GD_UD | 3;
+  e->env_tf.tf_es = GD_UD | 3;
+  e->env_tf.tf_ss = GD_UD | 3;
+  e->env_tf.tf_cs = GD_UT | 3;
+  //TODO
 #endif
+
   // You will set e->env_tf.tf_rip later.
 
   // commit the allocation
@@ -221,10 +240,60 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
 }
 
 #ifdef CONFIG_KSPACE
-static void
-bind_functions(struct Env *e, struct Elf *elf) {
+static int
+bind_functions(struct Env *e, uint8_t *binary) {
   //find_function from kdebug.c should be used
   // LAB 3: Your code here.
+
+  struct Elf *elf    = (struct Elf *)binary;
+  struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
+  const char *shstr  = (char *)binary + sh[elf->e_shstrndx].sh_offset;
+
+  // Find string table
+  size_t strtab = 0;
+  for (size_t i = 0; i < elf->e_shnum; i++) {
+    if (sh[i].sh_type == ELF_SHT_STRTAB && !strcmp(".strtab", shstr + sh[i].sh_name)) {
+      strtab = i;
+      break;
+    }
+  }
+  const char *strings = (char *)binary + sh[strtab].sh_offset;
+
+  for (size_t i = 0; i < elf->e_shnum; i++) {
+    if (sh[i].sh_type == ELF_SHT_SYMTAB) {
+      struct Elf64_Sym *syms = (struct Elf64_Sym *)(binary + sh[i].sh_offset);
+
+      if (sh[i].sh_entsize != sizeof(*syms)) {
+        cprintf("Unexpected symbol size: %lu\nShould be: %lu\n",
+                (unsigned long)sh[i].sh_entsize, (unsigned long)sizeof(*syms));
+        return -E_INVALID_EXE;
+      }
+
+      size_t nsyms = sh[i].sh_size / sizeof(*syms);
+
+      for (size_t i = 0; i < nsyms; i++) {
+        // Only handle symbols that we know how to bind
+        if (ELF64_ST_BIND(syms[i].st_info) == STB_GLOBAL &&
+            syms[i].st_other == STV_DEFAULT &&
+            syms[i].st_size == sizeof(void *)) {
+          const char *name = strings + syms[i].st_name;
+          uintptr_t addr;
+          if (!strcmp(name, "sys_yield")) {
+            addr = (uintptr_t)sys_yield;
+          } else if (!strcmp(name, "sys_exit")) {
+            addr = (uintptr_t)sys_exit;
+          } else {
+            addr = find_function(name);
+          }
+          cprintf("Bind function '%s' to %p\n", name, (void *)addr);
+          if (addr) {
+            *((uintptr_t *)syms[i].st_value) = addr;
+          }
+        }
+      }
+    }
+  }
+  return 0;
 }
 #endif
 
@@ -270,6 +339,88 @@ load_icode(struct Env *e, uint8_t *binary) {
   //  What?  (See env_run() and env_pop_tf() below.)
 
   // LAB 3: Your code here.
+  struct Elf *elf = (struct Elf *)binary;
+  if (elf->e_magic != ELF_MAGIC ||
+      elf->e_elf[0] != 2 /* 64-bit */ ||
+      elf->e_elf[1] != 1 /* little endian */ ||
+      elf->e_elf[2] != 1 /* version 1 */ ||
+      elf->e_type != ET_EXEC /* executable */ ||
+      elf->e_machine != 0x3E /* amd64 */) {
+    cprintf("Unexpected ELF format\n");
+    panic("Bad ELF");
+  }
+
+  if (elf->e_ehsize < (sizeof(struct Elf))) {
+    cprintf("ELF header is too smal: %u \nShould be at least %u\n",
+            (unsigned)elf->e_ehsize, (unsigned)sizeof(struct Elf));
+    panic("Bad ELF");
+  }
+
+  if (elf->e_shentsize != sizeof(struct Secthdr)) {
+    cprintf("Unexpected section header size %u\n Should be %u\n",
+            (unsigned)elf->e_shentsize, (unsigned)sizeof(struct Secthdr));
+    panic("Bad ELF");
+  }
+
+  if (elf->e_phentsize != sizeof(struct Proghdr)) {
+    cprintf("Unexpected program header size %u\n Should be %u\n",
+            (unsigned)elf->e_phentsize, (unsigned)sizeof(struct Proghdr));
+    panic("Bad ELF");
+  }
+
+  if (elf->e_shstrndx >= elf->e_shnum) {
+    cprintf("Unexpected string section %u overflows total number of sections %u\n",
+            (unsigned)elf->e_shstrndx, (unsigned)elf->e_shnum);
+    panic("Bad ELF");
+  }
+
+  struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
+  if (sh[elf->e_shstrndx].sh_type != ELF_SHT_STRTAB) {
+    cprintf("String table section index points to section of other type %d",
+            (unsigned)sh->sh_type);
+    panic("Bad ELF");
+  }
+
+  struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
+  size_t min_addr = UTOP, max_addr = 0;
+  for (size_t i = 0; i < elf->e_phnum; i++) {
+    if (ph[i].p_type == ELF_PROG_LOAD) {
+
+      min_addr = MIN(min_addr, ph[i].p_va);
+      max_addr = MAX(max_addr, ph[i].p_va + ph[i].p_memsz);
+
+      void *src = binary + ph[i].p_offset;
+      void *dst = (void *)ph[i].p_va;
+
+      size_t memsz  = ph[i].p_memsz;
+      size_t filesz = MIN(ph[i].p_filesz, memsz);
+
+      cprintf("Loading section of size 0x%08lX to %p...\n", (unsigned long)filesz, dst);
+
+      memcpy(dst, src, filesz);
+      memset(dst + filesz, 0, memsz - filesz);
+    }
+  }
+
+  if (max_addr <= min_addr) {
+    cprintf("Invalid memory mappings\n");
+    panic("Bad ELF");
+  }
+
+  e->env_tf.tf_rip = elf->e_entry;
+  if (elf->e_entry >= max_addr || elf->e_entry < min_addr) {
+    cprintf("Program entry point %lu is outside proram data\n",
+            (unsigned long)elf->e_entry);
+    panic("Bad ELF");
+  }
+
+  int res = bind_functions(e, binary);
+  if (res < 0) {
+    cprintf("Failed to bind functions: %i\n", res);
+    panic("Bad ELF");
+  }
+
+  cprintf("Program entry point %lx\n", (unsigned long)elf->e_entry);
 }
 
 //
@@ -282,6 +433,15 @@ load_icode(struct Env *e, uint8_t *binary) {
 void
 env_create(uint8_t *binary, enum EnvType type) {
   // LAB 3: Your code here.
+
+  struct Env *newenv;
+  if (env_alloc(&newenv, 0) < 0) {
+    panic("Can't allocate new environment");
+  }
+
+  newenv->env_type = type;
+
+  load_icode(newenv, binary);
 }
 
 //
@@ -309,6 +469,12 @@ env_destroy(struct Env *e) {
   // If e is currently running on other CPUs, we change its state to
   // ENV_DYING. A zombie environment will be freed the next time
   // it traps to the kernel.
+
+  e->env_status = ENV_DYING;
+  if (e == curenv) {
+    env_free(e);
+    sched_yield();
+  }
 }
 
 #ifdef CONFIG_KSPACE
@@ -399,20 +565,40 @@ env_run(struct Env *e) {
 #endif
 
   // Step 1: If this is a context switch (a new environment is running):
-  //	   1. Set the current environment (if any) back to
-  //	      ENV_RUNNABLE if it is ENV_RUNNING (think about
-  //	      what other states it can be in),
-  //	   2. Set 'curenv' to the new environment,
-  //	   3. Set its status to ENV_RUNNING,
-  //	   4. Update its 'env_runs' counter,
+  //       1. Set the current environment (if any) back to
+  //          ENV_RUNNABLE if it is ENV_RUNNING (think about
+  //          what other states it can be in),
+  //       2. Set 'curenv' to the new environment,
+  //       3. Set its status to ENV_RUNNING,
+  //       4. Update its 'env_runs' counter,
   // Step 2: Use env_pop_tf() to restore the environment's
-  //	   registers and starting execution of process.
+  //       registers and starting execution of process.
 
   // Hint: This function loads the new environment's state from
-  //	e->env_tf.  Go back through the code you wrote above
-  //	and make sure you have set the relevant parts of
-  //	e->env_tf to sensible values.
+  //    e->env_tf.  Go back through the code you wrote above
+  //    and make sure you have set the relevant parts of
+  //    e->env_tf to sensible values.
   //
   // LAB 3: Your code here.
-  while(1) {}
+
+  if (curenv) {
+    if (curenv->env_status == ENV_DYING) {
+      struct Env *old = curenv;
+      env_free(curenv);
+      if (old == e) {
+        sched_yield();
+      }
+    } else if (curenv->env_status == ENV_RUNNING) {
+      curenv->env_status = ENV_RUNNABLE;
+    }
+  }
+
+  curenv             = e;
+  curenv->env_status = ENV_RUNNING;
+  curenv->env_runs++;
+
+  env_pop_tf(&curenv->env_tf);
+
+  // Unreachable
+  while (1) {}
 }
