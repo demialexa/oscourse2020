@@ -72,9 +72,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   uintptr_t rip, *rbp;
 
   // Read current address and current stack frame
-  asm("movq %%rbp, %0\n"
-      "movq 8(%%rbp), %1\n"
-      : "=r"(rbp), "=r"(rip));
+  rbp = (uintptr_t *)read_rbp();
 
   cprintf("Stack backtrace: \n");
   do {
@@ -82,16 +80,9 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
     struct Ripdebuginfo info;
     debuginfo_rip(rip, &info);
 
-    int nmlen = info.rip_fn_namelen;
-
-    // Cut off name if it is too long
-    if (nmlen > 255)
-      nmlen = 255;
-
-    // Make name NULL-terminated
-    info.rip_fn_name[nmlen] = '\0';
     cprintf("    rbp %016lx  rip %016lx\n", (unsigned long)rbp, (unsigned long)rip);
-    cprintf("        %s:%d: %s+%ld\n", info.rip_file, info.rip_line, info.rip_fn_name, rip - info.rip_fn_addr);
+    cprintf("        %.256s:%d: %.*s+%ld\n", info.rip_file, info.rip_line,
+            info.rip_fn_namelen, info.rip_fn_name, rip - info.rip_fn_addr);
 
     // Next stack frame
     rbp = (uintptr_t *)rbp[0];
