@@ -17,7 +17,7 @@ entry:
   # Clear the frame pointer register (RBP)
   # so that once we get into debugging C code,
   # stack backtraces will be terminated properly.
-  xorq %rbp, %rbp      # nuke frame pointer
+  xor %ebp, %ebp   # nuke frame pointer
 
   # now to C code
   call i386_init
@@ -37,7 +37,7 @@ _generall_syscall:
   popq ret_rip(%rip)
   movq %rbp, rbp_reg(%rip)
   movq %rsp, rsp_reg(%rip)
-  movq $0x0,%rbp
+  xor %ebp, %ebp
   leaq bootstacktop(%rip),%rsp
   pushq $GD_KD
   pushq rsp_reg(%rip)
@@ -80,6 +80,9 @@ sys_yield:
 .globl sys_exit
 .type  sys_exit, @function
 sys_exit:
+  leaq bootstacktop(%rip),%rsp
+  xor %ebp, %ebp
+  call csys_exit
   jmp .
 #endif
 
