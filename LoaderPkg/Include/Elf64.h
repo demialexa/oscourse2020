@@ -59,19 +59,49 @@ struct Elf64_Sym {
   UINT64            st_size;
 };
 
-#define STT_NOTYPE  0
-#define STT_OBJECT  1
-#define STT_FUNC    2
-#define STT_SECTION 3
-#define STT_FILE    4
-#define STT_COMMON  5
-#define STT_TLS     6
+/* Values for e_type. */
+#define ET_NONE    0  /* Unknown type. */
+#define ET_REL    1  /* Relocatable. */
+#define ET_EXEC    2  /* Executable. */
+#define ET_DYN    3  /* Shared object. */
+#define ET_CORE    4  /* Core file. */
+#define ET_LOOS    0xfe00  /* First operating system specific. */
+#define ET_HIOS    0xfeff  /* Last operating system-specific. */
+#define ET_LOPROC  0xff00  /* First processor-specific. */
+#define ET_HIPROC  0xffff  /* Last processor-specific. */
 
-#define STB_LOCAL  0
-#define STB_GLOBAL 1
-#define STB_WEAK   2
-#define STB_LOPROC 13
-#define STB_HIPROC 12
+/* Values for e_machine. */
+#define EM_X86_64  62  /* Advanced Micro Devices x86-64 */
+#define EM_AMD64  EM_X86_64  /* Advanced Micro Devices x86-64 (compat) */
+
+/* Symbol Binding - ELFNN_ST_BIND - st_info */
+#define STB_LOCAL  0  /* Local symbol */
+#define STB_GLOBAL  1  /* Global symbol */
+#define STB_WEAK  2  /* like global - lower precedence */
+#define STB_LOOS  10  /* Reserved range for operating system */
+#define STB_HIOS  12  /*   specific semantics. */
+#define STB_LOPROC  13  /* reserved range for processor */
+#define STB_HIPROC  15  /*   specific semantics. */
+
+/* Symbol type - ELFNN_ST_TYPE - st_info */
+#define STT_NOTYPE  0  /* Unspecified type. */
+#define STT_OBJECT  1  /* Data object. */
+#define STT_FUNC  2  /* Function. */
+#define STT_SECTION  3  /* Section. */
+#define STT_FILE  4  /* Source file. */
+#define STT_COMMON  5  /* Uninitialized common block. */
+#define STT_TLS    6  /* TLS object. */
+#define STT_NUM    7
+#define STT_LOOS  10  /* Reserved range for operating system */
+#define STT_HIOS  12  /*   specific semantics. */
+#define STT_LOPROC  13  /* reserved range for processor */
+#define STT_HIPROC  15  /*   specific semantics. */
+
+/* Symbol visibility - ELFNN_ST_VISIBILITY - st_other */
+#define STV_DEFAULT  0x0  /* Default visibility (see binding). */
+#define STV_INTERNAL  0x1  /* Special meaning in relocatable objects. */
+#define STV_HIDDEN  0x2  /* Not visible. */
+#define STV_PROTECTED  0x3  /* Visible but not preemptible. */
 
 /*
  * Macros for manipulating st_info
