@@ -100,5 +100,17 @@ find_function(const char *const fname) {
   // and naive_address_by_fname which performs full traversal of DIE tree.
   // LAB 3: Your code here
 
+  struct Dwarf_Addrs addrs;
+  load_kernel_dwarf_info(&addrs);
+  uintptr_t offset = 0;
+
+  if (!address_by_fname(&addrs, fname, &offset) && offset) {
+    return offset;
+  }
+
+  if (!naive_address_by_fname(&addrs, fname, &offset)) {
+    return offset;
+  }
+
   return 0;
 }
