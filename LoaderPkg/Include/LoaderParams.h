@@ -53,6 +53,15 @@ typedef struct {
   EFI_PHYSICAL_ADDRESS     DebugPubnamesEnd;
   EFI_PHYSICAL_ADDRESS     DebugPubtypesStart;
   EFI_PHYSICAL_ADDRESS     DebugPubtypesEnd;
+
+  ///
+  /// Kernel symbols
+  ///
+  EFI_PHYSICAL_ADDRESS     SymbolTableStart;
+  EFI_PHYSICAL_ADDRESS     SymbolTableEnd;
+  EFI_PHYSICAL_ADDRESS     StringTableStart;
+  EFI_PHYSICAL_ADDRESS     StringTableEnd;
+
 } LOADER_PARAMS;
 
 #endif // LOADER_PARAMS_H

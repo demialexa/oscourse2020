@@ -249,6 +249,11 @@ bind_functions(struct Env *e, uint8_t *binary) {
   struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
   const char *shstr  = (char *)binary + sh[elf->e_shstrndx].sh_offset;
 
+  // Load kernel symbol and string tables
+  struct Elf64_Sym *ksyms    = (struct Elf64_Sym *)uefi_lp->SymbolTableStart;
+  struct Elf64_Sym *ksymsend = (struct Elf64_Sym *)uefi_lp->SymbolTableEnd;
+  const char *kstrs          = (char *)uefi_lp->StringTableStart;
+
   // Find string table
   size_t strtab = 0;
   for (size_t i = 0; i < elf->e_shnum; i++) {
@@ -258,17 +263,6 @@ bind_functions(struct Env *e, uint8_t *binary) {
     }
   }
   const char *strings = (char *)binary + sh[strtab].sh_offset;
-
-  // Assembly lables are not a part of debug info
-  // and we don't have proper symbol table
-  // so bind them separately
-  struct {
-      const char *name;
-      uintptr_t addr;
-  } syscalls[] = {
-      { "sys_yield", (uintptr_t)sys_yield },
-      { "sys_exit", (uintptr_t)sys_exit },
-  };
 
   for (size_t i = 0; i < elf->e_shnum; i++) {
     if (sh[i].sh_type == ELF_SHT_SYMTAB) {
@@ -289,10 +283,13 @@ bind_functions(struct Env *e, uint8_t *binary) {
             syms[j].st_other == STV_DEFAULT &&
             syms[j].st_size == sizeof(void *)) {
           const char *name = strings + syms[j].st_name;
-          uintptr_t addr = -1ULL;
-          for (size_t k = 0; k < sizeof syscalls/sizeof *syscalls; k++) {
-            if (!strcmp(syscalls[k].name, name)) {
-              addr = syscalls[k].addr;
+          uintptr_t addr   = -1ULL;
+
+          for (struct Elf64_Sym *ksym = ksyms; ksym < ksymsend; ksym++) {
+            if (!strcmp(kstrs + ksym->st_name, name)) {
+              addr = ksym->st_value;
+              cprintf("name: %s=%016lx\n", name, addr);
+              break;
             }
           }
           if (addr == -1ULL) {

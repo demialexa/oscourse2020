@@ -652,16 +652,14 @@ LoadKernel (
     {".debug_line",     OFFSET_OF (LOADER_PARAMS, DebugLineStart),     OFFSET_OF (LOADER_PARAMS, DebugLineEnd)},
     {".debug_str",      OFFSET_OF (LOADER_PARAMS, DebugStrStart),      OFFSET_OF (LOADER_PARAMS, DebugStrEnd)},
     {".debug_pubnames", OFFSET_OF (LOADER_PARAMS, DebugPubnamesStart), OFFSET_OF (LOADER_PARAMS, DebugPubnamesEnd)},
-    {".debug_pubtypes", OFFSET_OF (LOADER_PARAMS, DebugPubtypesStart), OFFSET_OF (LOADER_PARAMS, DebugPubtypesEnd)}
+    {".debug_pubtypes", OFFSET_OF (LOADER_PARAMS, DebugPubtypesStart), OFFSET_OF (LOADER_PARAMS, DebugPubtypesEnd)},
+    {".symtab",         OFFSET_OF (LOADER_PARAMS, SymbolTableStart),   OFFSET_OF (LOADER_PARAMS, SymbolTableEnd)},
+    {".strtab",         OFFSET_OF (LOADER_PARAMS, StringTableStart),   OFFSET_OF (LOADER_PARAMS, StringTableEnd)},
   };
 
   Status = EFI_SUCCESS;
 
   for (Index = 0; Index < ElfHeader.e_shnum; ++Index) {
-    if (Sections[Index].sh_type != ELF_SHT_PROGBITS) {
-      continue;
-    }
-
     Status = CheckedReadString (
       KernelFile,
       StringOffset + Sections[Index].sh_name,
@@ -690,6 +688,7 @@ LoadKernel (
       (UINT32) Sections[Index].sh_name
       ));
 
+    DEBUG((DEBUG_INFO, "JOSSection %a\n", NameTemp));
     for (Index2 = 0; Index2 < ARRAY_SIZE (mDebugMapping); ++Index2) {
       ASSERT (AsciiStrSize (mDebugMapping[Index2].Name) <= sizeof (NameTemp));
 
