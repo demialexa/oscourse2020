@@ -41,7 +41,7 @@ extern void sys_yield(void);
     extern uint8_t ENV_PASTE3(_binary_obj_, x, _start)[]; \
     extern uintptr_t ENV_PASTE3(_binary_obj_, x, _size);  \
     env_create(ENV_PASTE3(_binary_obj_, x, _start),       \
-               ENV_PASTE3(_binary_obj_, x, _size),       \
+               ENV_PASTE3(_binary_obj_, x, _size),        \
                ENV_TYPE_KERNEL);                          \
   } while (0)
 
