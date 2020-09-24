@@ -269,7 +269,6 @@ bind_functions(struct Env *e, uint8_t *binary) {
       { "sys_yield", (uintptr_t)sys_yield },
       { "sys_exit", (uintptr_t)sys_exit },
   };
-  //cprintf("csys_exit %lu, ", find_function("csys_exit"));
 
   for (size_t i = 0; i < elf->e_shnum; i++) {
     if (sh[i].sh_type == ELF_SHT_SYMTAB) {
