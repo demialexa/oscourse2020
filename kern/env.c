@@ -377,7 +377,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
 
   if (size < sizeof(struct Elf)) {
     cprintf("Elf file is too small\n");
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   // LAB 3: Your code here.
@@ -389,63 +389,63 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
       elf->e_type != ET_EXEC /* executable */ ||
       elf->e_machine != 0x3E /* amd64 */) {
     cprintf("Unexpected ELF format\n");
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   if (elf->e_ehsize < (sizeof(struct Elf))) {
     cprintf("ELF header is too smal: %u \nShould be at least %u\n",
             (unsigned)elf->e_ehsize, (unsigned)sizeof(struct Elf));
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   if (elf->e_shentsize != sizeof(struct Secthdr)) {
     cprintf("Unexpected section header size %u\n Should be %u\n",
             (unsigned)elf->e_shentsize, (unsigned)sizeof(struct Secthdr));
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   if (elf->e_phentsize != sizeof(struct Proghdr)) {
     cprintf("Unexpected program header size %u\n Should be %u\n",
             (unsigned)elf->e_phentsize, (unsigned)sizeof(struct Proghdr));
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   if (elf->e_shstrndx >= elf->e_shnum) {
     cprintf("Unexpected string section %u overflows total number of sections %u\n",
             (unsigned)elf->e_shstrndx, (unsigned)elf->e_shnum);
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
   if ((uint8_t *)(sh + elf->e_shnum) > binary + size) {
     cprintf("Section table exceeds file contents: %lu > %lu\n",
             (unsigned long)((uint8_t*)(sh + elf->e_shnum) - binary), size);
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
   if (sh[elf->e_shstrndx].sh_type != ELF_SHT_STRTAB) {
     cprintf("String table section index points to section of other type %d\n",
             (unsigned)sh->sh_type);
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
   if (sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size > size) {
     cprintf("String table size exceeds file size: %lu > %lu\n",
             (unsigned long)(sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size), (unsigned long)size);
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
   if (!sh[elf->e_shstrndx].sh_size) {
     cprintf("String table is empty\n");
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
   if (binary[sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size - 1]) {
     cprintf("String table is not NUL-terminated\n");
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
   if ((uint8_t *)(ph + elf->e_phnum) > binary + size) {
     cprintf("Program header table exceeds file contents: %lu > %lu\n",
             (unsigned long)((uint8_t*)(ph + elf->e_phnum) - binary), size);
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   uintptr_t min_addr = UTOP, max_addr = 0;
@@ -465,12 +465,12 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
       if ((uint8_t *)src + filesz > binary + size) {
         cprintf("Section contents exceeds file size: %lu > %lu\n",
             (unsigned long)((uint8_t*)(src + filesz) - binary), size);
-        panic("Bad ELF");
+        goto e_invaid_elf;
       }
 
       if ((uintptr_t)dst + memsz > UTOP) {
         cprintf("Section contents exceeds user memory: %p > %p\n", (dst + memsz), (void *)UTOP);
-        panic("Bad ELF");
+        goto e_invaid_elf;
       }
 
       cprintf("Loading section of size 0x%08lX to %p...\n", (unsigned long)filesz, dst);
@@ -482,23 +482,28 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
 
   if (max_addr <= min_addr || max_addr >= UTOP) {
     cprintf("Invalid memory mappings\n");
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   e->env_tf.tf_rip = elf->e_entry;
   if (elf->e_entry >= max_addr || elf->e_entry < min_addr) {
     cprintf("Program entry point %lu is outside proram data\n",
             (unsigned long)elf->e_entry);
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   int res = bind_functions(e, binary, size, min_addr, max_addr);
   if (res < 0) {
     cprintf("Failed to bind functions: %i\n", res);
-    panic("Bad ELF");
+    goto e_invaid_elf;
   }
 
   cprintf("Program entry point %lx\n", (unsigned long)elf->e_entry);
+
+e_invaid_elf:
+  // TODO Later it would be better to just return error code
+  //      insert of just panicing...
+  panic("Bad ELF");
 }
 
 //
