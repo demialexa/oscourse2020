@@ -268,7 +268,7 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
     }
   }
   if (strtab == -1UL) {
-    cprintf("String table is absent");
+    cprintf("String table is absent\n");
     return 0;
   }
   const char *strings = (char *)binary + sh[strtab].sh_offset;
