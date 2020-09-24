@@ -539,6 +539,9 @@ cons_getc(void) {
 // output a character to the console
 static void
 cons_putc(int c) {
+  // Characters with codes
+  // higher than 127 are not supported yet
+  c &= 0x7F;
   serial_putc(c);
   lpt_putc(c);
   fb_putc(c);
