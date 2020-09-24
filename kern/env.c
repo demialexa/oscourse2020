@@ -129,10 +129,10 @@ env_init(void) {
   // LAB 3: Your code here.
 
   env_free_list = NULL;
-  for (int i = NENV; i > 0; i--) {
-    envs[i - 1].env_link = env_free_list;
-    envs[i - 1].env_id   = 0;
-    env_free_list        = &envs[i - 1];
+  for (int i = NENV - 1; i >= 0; i--) {
+    envs[i].env_link = env_free_list;
+    envs[i].env_id   = 0;
+    env_free_list    = &envs[i];
   }
 }
 
@@ -259,6 +259,18 @@ bind_functions(struct Env *e, uint8_t *binary) {
   }
   const char *strings = (char *)binary + sh[strtab].sh_offset;
 
+  // Assembly lables are not a part of debug info
+  // and we don't have proper symbol table
+  // so bind them separately
+  struct {
+      const char *name;
+      uintptr_t addr;
+  } syscalls[] = {
+      { "sys_yield", (uintptr_t)sys_yield },
+      { "sys_exit", (uintptr_t)sys_exit },
+  };
+  //cprintf("csys_exit %lu, ", find_function("csys_exit"));
+
   for (size_t i = 0; i < elf->e_shnum; i++) {
     if (sh[i].sh_type == ELF_SHT_SYMTAB) {
       struct Elf64_Sym *syms = (struct Elf64_Sym *)(binary + sh[i].sh_offset);
@@ -271,23 +283,24 @@ bind_functions(struct Env *e, uint8_t *binary) {
 
       size_t nsyms = sh[i].sh_size / sizeof(*syms);
 
-      for (size_t i = 0; i < nsyms; i++) {
+      for (size_t j = 0; j < nsyms; j++) {
         // Only handle symbols that we know how to bind
-        if (ELF64_ST_BIND(syms[i].st_info) == STB_GLOBAL &&
-            syms[i].st_other == STV_DEFAULT &&
-            syms[i].st_size == sizeof(void *)) {
-          const char *name = strings + syms[i].st_name;
-          uintptr_t addr;
-          if (!strcmp(name, "sys_yield")) {
-            addr = (uintptr_t)sys_yield;
-          } else if (!strcmp(name, "sys_exit")) {
-            addr = (uintptr_t)sys_exit;
-          } else {
+        if (ELF64_ST_BIND(syms[j].st_info) == STB_GLOBAL &&
+            syms[j].st_other == STV_DEFAULT &&
+            syms[j].st_size == sizeof(void *)) {
+          const char *name = strings + syms[j].st_name;
+          uintptr_t addr = -1ULL;
+          for (size_t k = 0; k < sizeof syscalls/sizeof *syscalls; k++) {
+            if (!strcmp(syscalls[k].name, name)) {
+              addr = syscalls[k].addr;
+            }
+          }
+          if (addr == -1ULL) {
             addr = find_function(name);
           }
           cprintf("Bind function '%s' to %p\n", name, (void *)addr);
           if (addr) {
-            *((uintptr_t *)syms[i].st_value) = addr;
+            *((uintptr_t *)syms[j].st_value) = addr;
           }
         }
       }
