@@ -499,6 +499,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
   }
 
   cprintf("Program entry point %lx\n", (unsigned long)elf->e_entry);
+  return;
 
 e_invaid_elf:
   // TODO Later it would be better to just return error code
