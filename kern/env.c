@@ -286,6 +286,7 @@ bind_functions(struct Env *e, uint8_t *binary) {
       for (size_t j = 0; j < nsyms; j++) {
         // Only handle symbols that we know how to bind
         if (ELF64_ST_BIND(syms[j].st_info) == STB_GLOBAL &&
+            ELF64_ST_TYPE(syms[j].st_info) == STT_OBJECT &&
             syms[j].st_other == STV_DEFAULT &&
             syms[j].st_size == sizeof(void *)) {
           const char *name = strings + syms[j].st_name;
