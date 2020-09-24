@@ -100,6 +100,17 @@ find_function(const char *const fname) {
   // and naive_address_by_fname which performs full traversal of DIE tree.
   // LAB 3: Your code here
 
+  // Load kernel symbol and string tables
+  struct Elf64_Sym *ksyms    = (struct Elf64_Sym *)uefi_lp->SymbolTableStart;
+  struct Elf64_Sym *ksymsend = (struct Elf64_Sym *)uefi_lp->SymbolTableEnd;
+  const char *kstrs          = (char *)uefi_lp->StringTableStart;
+
+  for (struct Elf64_Sym *ksym = ksyms; ksym < ksymsend; ksym++) {
+    if (!strcmp(kstrs + ksym->st_name, fname)) {
+      return ksym->st_value;
+    }
+  }
+
   struct Dwarf_Addrs addrs;
   load_kernel_dwarf_info(&addrs);
   uintptr_t offset = 0;
