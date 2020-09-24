@@ -14,7 +14,7 @@ void env_init(void);
 void env_init_percpu(void);
 int env_alloc(struct Env **e, envid_t parent_id);
 void env_free(struct Env *e);
-void env_create(uint8_t *binary, enum EnvType type);
+void env_create(uint8_t *binary, size_t size, enum EnvType type);
 void env_destroy(struct Env *e); // Does not return if e == curenv
 
 int envid2env(envid_t envid, struct Env **env_store, bool checkperm);
@@ -39,7 +39,9 @@ extern void sys_yield(void);
 #define ENV_CREATE_KERNEL_TYPE(x)                         \
   do {                                                    \
     extern uint8_t ENV_PASTE3(_binary_obj_, x, _start)[]; \
+    extern uintptr_t ENV_PASTE3(_binary_obj_, x, _size);  \
     env_create(ENV_PASTE3(_binary_obj_, x, _start),       \
+               ENV_PASTE3(_binary_obj_, x, _size),       \
                ENV_TYPE_KERNEL);                          \
   } while (0)
 

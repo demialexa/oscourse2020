@@ -241,27 +241,59 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
 
 #ifdef CONFIG_KSPACE
 static int
-bind_functions(struct Env *e, uint8_t *binary) {
+bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_start, uintptr_t image_end) {
   //find_function from kdebug.c should be used
   // LAB 3: Your code here.
 
   struct Elf *elf    = (struct Elf *)binary;
   struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
   const char *shstr  = (char *)binary + sh[elf->e_shstrndx].sh_offset;
+  if ((uint8_t *)(shstr + sh[elf->e_shstrndx].sh_size) > binary + size) {
+    cprintf("String table exceeds file contents: %lu > %lu\n",
+            (unsigned long)((uint8_t *)shstr - binary), (unsigned long)size);
+    return -E_INVALID_EXE;
+  }
 
   // Find string table
-  size_t strtab = 0;
+  size_t strtab = -1UL;
   for (size_t i = 0; i < elf->e_shnum; i++) {
+    if (sh[i].sh_name > sh[elf->e_shstrndx].sh_size) {
+      cprintf("String table exceeds string table: %lu > %lu\n",
+              (unsigned long)sh[i].sh_name, (unsigned long)sh[elf->e_shstrndx].sh_size);
+      return -E_INVALID_EXE;
+    }
     if (sh[i].sh_type == ELF_SHT_STRTAB && !strcmp(".strtab", shstr + sh[i].sh_name)) {
       strtab = i;
       break;
     }
   }
+  if (strtab == -1UL) {
+    cprintf("String table is absent");
+    return 0;
+  }
   const char *strings = (char *)binary + sh[strtab].sh_offset;
+  if ((uint8_t *)(strings + sh[strtab].sh_size) > binary + size) {
+    cprintf("String table exceeds file contents: %lu > %lu\n",
+            (unsigned long)((uint8_t *)strings + sh[strtab].sh_size - binary), (unsigned long)size);
+    return -E_INVALID_EXE;
+  }
+  if (!sh[strtab].sh_size) {
+    cprintf("String table is empty\n");
+    return -E_INVALID_EXE;
+  }
+  if (binary[sh[strtab].sh_offset + sh[strtab].sh_size - 1]) {
+    cprintf("String table is not NUL-terminated\n");
+    return -E_INVALID_EXE;
+  }
 
   for (size_t i = 0; i < elf->e_shnum; i++) {
     if (sh[i].sh_type == ELF_SHT_SYMTAB) {
       struct Elf64_Sym *syms = (struct Elf64_Sym *)(binary + sh[i].sh_offset);
+      if (sh[i].sh_offset + sh[i].sh_size > size) {
+        cprintf("Symbol table exceeds file contents: %lu > %lu\n",
+                (unsigned long)(sh[i].sh_offset + sh[i].sh_size), (unsigned long)size);
+        return -E_INVALID_EXE;
+      }
 
       if (sh[i].sh_entsize != sizeof(*syms)) {
         cprintf("Unexpected symbol size: %lu\nShould be: %lu\n",
@@ -278,9 +310,19 @@ bind_functions(struct Env *e, uint8_t *binary) {
             syms[j].st_other == STV_DEFAULT &&
             syms[j].st_size == sizeof(void *)) {
           const char *name = strings + syms[j].st_name;
+          if (name > strings + sh[strtab].sh_size) {
+            cprintf("String table exceeds string table: %lu > %lu\n",
+                (unsigned long)syms[j].st_name, (unsigned long)sh[strtab].sh_size);
+            return -E_INVALID_EXE;
+          }
           uintptr_t addr = find_function(name);
 
           cprintf("Bind function '%s' to %p\n", name, (void *)addr);
+          if (syms[j].st_value < image_start || syms[j].st_value > image_end) {
+            cprintf("Symbol value points outside program image: %p\n",
+                (uint8_t *)syms[j].st_value);
+            return -E_INVALID_EXE;
+          }
           if (addr) {
             memcpy((void *)syms[j].st_value, &addr, sizeof(void *));
           }
@@ -313,7 +355,7 @@ bind_functions(struct Env *e, uint8_t *binary) {
 //  - How might load_icode fail?  What might be wrong with the given input?
 //
 static void
-load_icode(struct Env *e, uint8_t *binary) {
+load_icode(struct Env *e, uint8_t *binary, size_t size) {
   // Hints:
   //  Load each program segment into memory
   //  at the address specified in the ELF section header.
@@ -332,6 +374,11 @@ load_icode(struct Env *e, uint8_t *binary) {
   //  You must also do something with the program's entry point,
   //  to make sure that the environment starts executing there.
   //  What?  (See env_run() and env_pop_tf() below.)
+
+  if (size < sizeof(struct Elf)) {
+    cprintf("Elf file is too small\n");
+    panic("Bad ELF");
+  }
 
   // LAB 3: Your code here.
   struct Elf *elf = (struct Elf *)binary;
@@ -370,14 +417,38 @@ load_icode(struct Env *e, uint8_t *binary) {
   }
 
   struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
+  if ((uint8_t *)(sh + elf->e_shnum) > binary + size) {
+    cprintf("Section table exceeds file contents: %lu > %lu\n",
+            (unsigned long)((uint8_t*)(sh + elf->e_shnum) - binary), size);
+    panic("Bad ELF");
+  }
   if (sh[elf->e_shstrndx].sh_type != ELF_SHT_STRTAB) {
-    cprintf("String table section index points to section of other type %d",
+    cprintf("String table section index points to section of other type %d\n",
             (unsigned)sh->sh_type);
+    panic("Bad ELF");
+  }
+  if (sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size > size) {
+    cprintf("String table size exceeds file size: %lu > %lu\n",
+            (unsigned long)(sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size), (unsigned long)size);
+    panic("Bad ELF");
+  }
+  if (!sh[elf->e_shstrndx].sh_size) {
+    cprintf("String table is empty\n");
+    panic("Bad ELF");
+  }
+  if (binary[sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size - 1]) {
+    cprintf("String table is not NUL-terminated\n");
     panic("Bad ELF");
   }
 
   struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
-  size_t min_addr = UTOP, max_addr = 0;
+  if ((uint8_t *)(ph + elf->e_phnum) > binary + size) {
+    cprintf("Program header table exceeds file contents: %lu > %lu\n",
+            (unsigned long)((uint8_t*)(ph + elf->e_phnum) - binary), size);
+    panic("Bad ELF");
+  }
+
+  uintptr_t min_addr = UTOP, max_addr = 0;
   for (size_t i = 0; i < elf->e_phnum; i++) {
     if (ph[i].p_type == ELF_PROG_LOAD) {
 
@@ -387,8 +458,20 @@ load_icode(struct Env *e, uint8_t *binary) {
       void *src = binary + ph[i].p_offset;
       void *dst = (void *)ph[i].p_va;
 
+
       size_t memsz  = ph[i].p_memsz;
       size_t filesz = MIN(ph[i].p_filesz, memsz);
+
+      if ((uint8_t *)src + filesz > binary + size) {
+        cprintf("Section contents exceeds file size: %lu > %lu\n",
+            (unsigned long)((uint8_t*)(src + filesz) - binary), size);
+        panic("Bad ELF");
+      }
+
+      if ((uintptr_t)dst + memsz > UTOP) {
+        cprintf("Section contents exceeds user memory: %p > %p\n", (dst + memsz), (void *)UTOP);
+        panic("Bad ELF");
+      }
 
       cprintf("Loading section of size 0x%08lX to %p...\n", (unsigned long)filesz, dst);
 
@@ -397,7 +480,7 @@ load_icode(struct Env *e, uint8_t *binary) {
     }
   }
 
-  if (max_addr <= min_addr) {
+  if (max_addr <= min_addr || max_addr >= UTOP) {
     cprintf("Invalid memory mappings\n");
     panic("Bad ELF");
   }
@@ -409,7 +492,7 @@ load_icode(struct Env *e, uint8_t *binary) {
     panic("Bad ELF");
   }
 
-  int res = bind_functions(e, binary);
+  int res = bind_functions(e, binary, size, min_addr, max_addr);
   if (res < 0) {
     cprintf("Failed to bind functions: %i\n", res);
     panic("Bad ELF");
@@ -426,7 +509,7 @@ load_icode(struct Env *e, uint8_t *binary) {
 // The new env's parent ID is set to 0.
 //
 void
-env_create(uint8_t *binary, enum EnvType type) {
+env_create(uint8_t *binary, size_t size, enum EnvType type) {
   // LAB 3: Your code here.
 
   struct Env *newenv;
@@ -436,7 +519,7 @@ env_create(uint8_t *binary, enum EnvType type) {
 
   newenv->env_type = type;
 
-  load_icode(newenv, binary);
+  load_icode(newenv, binary, size);
 }
 
 //
