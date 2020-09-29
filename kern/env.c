@@ -215,8 +215,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
   // LAB 3: Your code here.
   // Allocate stack for new task
   static uintptr_t STACK_TOP = 0x2000000;
-  STACK_TOP -= 2 * PGSIZE;
   e->env_tf.tf_rsp = STACK_TOP;
+  STACK_TOP -= 2 * PGSIZE;
 
   // For now init trapframe with current RFLAGS
   e->env_tf.tf_rflags = read_rflags();
