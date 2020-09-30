@@ -4,10 +4,10 @@
 #include <kern/monitor.h>
 
 struct Taskstate cpu_ts;
-void sched_halt(void);
+_Noreturn void sched_halt(void);
 
 // Choose a user environment to run and run it.
-void
+_Noreturn void
 sched_yield(void) {
   // Implement simple round-robin scheduling.
   //
@@ -49,7 +49,7 @@ sched_yield(void) {
 // Halt this CPU when there is nothing to do. Wait until the
 // timer interrupt wakes it up. This function never returns.
 //
-void
+_Noreturn void
 sched_halt(void) {
   int i;
 
@@ -78,4 +78,7 @@ sched_halt(void) {
       "hlt\n"
       :
       : "a"(cpu_ts.ts_esp0));
+
+  // Unreachable
+  for(;;);
 }
