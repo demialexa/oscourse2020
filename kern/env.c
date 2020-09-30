@@ -219,8 +219,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
   e->env_tf.tf_rsp           = STACK_TOP;
   STACK_TOP -= 2 * PGSIZE;
 
-  // For now init trapframe with current RFLAGS
-  e->env_tf.tf_rflags = read_rflags();
+  // For now init trapframe with IF set
+  e->env_tf.tf_rflags = FL_IF | FL_IOPL_0;
 #else
   e->env_tf.tf_ds = GD_UD | 3;
   e->env_tf.tf_es = GD_UD | 3;
@@ -584,8 +584,12 @@ void
 env_pop_tf(struct Trapframe *tf) {
 #ifdef CONFIG_KSPACE
   static uintptr_t rip = 0;
-  rip                  = tf->tf_rip;
-  tf->tf_rflags &= ~FL_IF;
+
+  rip = tf->tf_rip;
+
+  // IF gets cleared on every syscall
+  // so set it back
+  tf->tf_rflags |= FL_IF;
 
   asm volatile(
       "movq %c[rbx](%[tf]), %%rbx \n\t"
