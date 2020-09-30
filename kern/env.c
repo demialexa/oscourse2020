@@ -69,8 +69,7 @@ struct Segdesc gdt[2 * NCPU + 7] =
         [8] = SEG_NULL //last 8 bytes of the tss since tss is 16 bytes long
 };
 
-struct Pseudodesc gdt_pd = {
-    sizeof(gdt) - 1, (unsigned long)gdt};
+struct Pseudodesc gdt_pd = {sizeof(gdt) - 1, (unsigned long)gdt};
 
 //
 // Converts an envid to an env pointer.
@@ -217,7 +216,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
   // LAB 3: Your code here.
   // Allocate stack for new task
   static uintptr_t STACK_TOP = 0x2000000;
-  e->env_tf.tf_rsp = STACK_TOP;
+  e->env_tf.tf_rsp           = STACK_TOP;
   STACK_TOP -= 2 * PGSIZE;
 
   // For now init trapframe with current RFLAGS
@@ -314,7 +313,7 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
           const char *name = strings + syms[j].st_name;
           if (name > strings + sh[strtab].sh_size) {
             cprintf("String table exceeds string table: %lu > %lu\n",
-                (unsigned long)syms[j].st_name, (unsigned long)sh[strtab].sh_size);
+                    (unsigned long)syms[j].st_name, (unsigned long)sh[strtab].sh_size);
             return -E_INVALID_EXE;
           }
           uintptr_t addr = find_function(name);
@@ -322,7 +321,7 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
           cprintf("Bind function '%s' to %p\n", name, (void *)addr);
           if (syms[j].st_value < image_start || syms[j].st_value > image_end) {
             cprintf("Symbol value points outside program image: %p\n",
-                (uint8_t *)syms[j].st_value);
+                    (uint8_t *)syms[j].st_value);
             return -E_INVALID_EXE;
           }
           if (addr) {
@@ -421,7 +420,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
   struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
   if ((uint8_t *)(sh + elf->e_shnum) > binary + size) {
     cprintf("Section table exceeds file contents: %lu > %lu\n",
-            (unsigned long)((uint8_t*)(sh + elf->e_shnum) - binary), size);
+            (unsigned long)((uint8_t *)(sh + elf->e_shnum) - binary), size);
     goto e_invaid_elf;
   }
   if (sh[elf->e_shstrndx].sh_type != ELF_SHT_STRTAB) {
@@ -446,7 +445,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
   struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
   if ((uint8_t *)(ph + elf->e_phnum) > binary + size) {
     cprintf("Program header table exceeds file contents: %lu > %lu\n",
-            (unsigned long)((uint8_t*)(ph + elf->e_phnum) - binary), size);
+            (unsigned long)((uint8_t *)(ph + elf->e_phnum) - binary), size);
     goto e_invaid_elf;
   }
 
@@ -460,13 +459,12 @@ load_icode(struct Env *e, uint8_t *binary, size_t size) {
       void *src = binary + ph[i].p_offset;
       void *dst = (void *)ph[i].p_va;
 
-
       size_t memsz  = ph[i].p_memsz;
       size_t filesz = MIN(ph[i].p_filesz, memsz);
 
       if ((uint8_t *)src + filesz > binary + size) {
         cprintf("Section contents exceeds file size: %lu > %lu\n",
-            (unsigned long)((uint8_t*)(src + filesz) - binary), size);
+                (unsigned long)((uint8_t *)(src + filesz) - binary), size);
         goto e_invaid_elf;
       }
 

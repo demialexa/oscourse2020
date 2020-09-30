@@ -21,7 +21,6 @@ rtc_init(void) {
 
   outb(IO_RTC_CMND, RTC_BREG);
   outb(IO_RTC_DATA, val | RTC_PIE);
-
 }
 
 uint8_t
