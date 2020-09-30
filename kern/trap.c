@@ -140,7 +140,6 @@ trap_dispatch(struct Trapframe *tf) {
     rtc_check_status();
     pic_send_eoi(IRQ_CLOCK);
     sched_yield();
-    return;
   }
 
   print_trapframe(tf);
