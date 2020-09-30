@@ -28,7 +28,7 @@ rtc_check_status(void) {
   uint8_t status = 0;
   // LAB 4: Your code here
 
-  outb(IO_RTC_CMND, RTC_BREG);
+  outb(IO_RTC_CMND, RTC_CREG);
   status = inb(IO_RTC_DATA);
 
   return status;
