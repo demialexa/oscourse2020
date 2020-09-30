@@ -596,7 +596,6 @@ env_pop_tf(struct Trapframe *tf) {
       "movq %c[rsi](%[tf]), %%rsi \n\t"
       "movq %c[rdi](%[tf]), %%rdi \n\t"
       "movq %c[rbp](%[tf]), %%rbp \n\t"
-      "movq %c[rsp](%[tf]), %%rsp \n\t"
       "movq %c[rd8](%[tf]), %%r8 \n\t"
       "movq %c[rd9](%[tf]), %%r9 \n\t"
       "movq %c[rd10](%[tf]), %%r10 \n\t"
@@ -605,12 +604,13 @@ env_pop_tf(struct Trapframe *tf) {
       "movq %c[rd13](%[tf]), %%r13 \n\t"
       "movq %c[rd14](%[tf]), %%r14 \n\t"
       "movq %c[rd15](%[tf]), %%r15 \n\t"
-      "pushq %c[rip](%[tf])\n\t"
+      "pushq %c[ss](%[tf])\n\t"
+      "pushq %c[rsp](%[tf])\n\t"
       "pushq %c[rflags](%[tf])\n\t"
+      "pushq %c[cs](%[tf])\n\t"
+      "pushq %c[rip](%[tf])\n\t"
       "movq %c[rax](%[tf]), %%rax\n\t"
-      "popfq\n\t"
-      "sti\n\t"
-      "ret\n\t"
+      "iretq\n\t"
       :
       : [ tf ] "a"(tf),
         [ rip ] "i"(offsetof(struct Trapframe, tf_rip)),
@@ -630,6 +630,8 @@ env_pop_tf(struct Trapframe *tf) {
         [ rd14 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r14)),
         [ rd15 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r15)),
         [ rflags ] "i"(offsetof(struct Trapframe, tf_rflags)),
+        [ cs ] "i"(offsetof(struct Trapframe, tf_cs)),
+        [ ss ] "i"(offsetof(struct Trapframe, tf_ss)),
         [ rsp ] "i"(offsetof(struct Trapframe, tf_rsp))
       : "cc", "memory", "ebx", "ecx", "edx", "esi", "edi");
 #else
