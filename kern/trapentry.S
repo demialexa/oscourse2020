@@ -21,6 +21,7 @@
 .align 2;
 #ifdef CONFIG_KSPACE
 clock_thdlr:
+  cli
   popq intr_ret_rip(%rip)
   popq intr_cs(%rip)
   popq intr_rflags(%rip)
