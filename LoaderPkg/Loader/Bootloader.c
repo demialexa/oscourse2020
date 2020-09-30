@@ -688,7 +688,6 @@ LoadKernel (
       (UINT32) Sections[Index].sh_name
       ));
 
-    DEBUG((DEBUG_INFO, "JOSSection %a\n", NameTemp));
     for (Index2 = 0; Index2 < ARRAY_SIZE (mDebugMapping); ++Index2) {
       ASSERT (AsciiStrSize (mDebugMapping[Index2].Name) <= sizeof (NameTemp));
 
