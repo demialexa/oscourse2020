@@ -64,7 +64,7 @@ trapname(int trapno) {
 
 void
 clock_idt_init(void) {
-  extern void (*clock_thdlr)(void);
+  extern void clock_thdlr(void);
   // init idt structure
   SETGATE(idt[IRQ_OFFSET + IRQ_CLOCK], 0, GD_KT, (uintptr_t)(&clock_thdlr), 0);
   lidt(&idt_pd);
