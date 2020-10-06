@@ -3,16 +3,23 @@
 
 #include <inc/types.h>
 
-// Debug information about a particular instruction pointer
-struct Ripdebuginfo {
-  char rip_file[256]; // Source code filename for RIP
-  int rip_line;       // Source code linenumber for RIP
+#define RIPDEBUG_BUFSIZ 256
 
-  char rip_fn_name[256]; // Name of function containing RIP
-                         //  - Note: not null terminated!
-  int rip_fn_namelen;    // Length of function name
-  uintptr_t rip_fn_addr; // Address of start of function
-  int rip_fn_narg;       // Number of function arguments
+/* Debug information about a particular instruction pointer */
+struct Ripdebuginfo {
+  /* Source code filename for RIP */
+  char rip_file[RIPDEBUG_BUFSIZ]; 
+  /* Source code linenumber for RIP */
+  int rip_line;       
+  /* Name of function containing RIP
+   * NOTE Not null terminated */
+  char rip_fn_name[RIPDEBUG_BUFSIZ]; 
+  /* Length of function name */
+  int rip_fn_namelen;    
+  /* Address of start of function */
+  uintptr_t rip_fn_addr; 
+  /* Number of function arguments */
+  int rip_fn_narg;       
 };
 
 int debuginfo_rip(uintptr_t eip, struct Ripdebuginfo *info);

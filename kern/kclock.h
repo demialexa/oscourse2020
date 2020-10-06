@@ -3,15 +3,15 @@
 #ifndef JOS_KERN_KCLOCK_H
 #define JOS_KERN_KCLOCK_H
 #ifndef JOS_KERNEL
-#error "This is a JOS kernel header; user programs should not #include it"
+#    error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
 #define IO_RTC_CMND 0x070 /* RTC control port */
 #define IO_RTC_DATA 0x071 /* RTC data port */
 
-#define NON_RATE_MASK(X)          (X & 0xF0)
+#define NON_RATE_MASK(X) (X & 0xF0)
 #define SET_NEW_RATE(input, rate) (NON_RATE_MASK(input) | rate)
-#define RTC_500MS_RATE            0x0F
+#define RTC_500MS_RATE 0x0F
 
 #define RTC_AREG 0x0A
 #define RTC_BREG 0x0B

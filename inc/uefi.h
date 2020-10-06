@@ -21,36 +21,31 @@ typedef uint64_t EFI_PHYSICAL_ADDRESS;
 typedef uint64_t EFI_VIRTUAL_ADDRESS;
 
 typedef struct {
-  ///
-  /// Type of the memory region.
-  /// Type EFI_MEMORY_TYPE is defined in the
-  /// AllocatePages() function description.
-  ///
+  /* Type of the memory region.
+   * Type EFI_MEMORY_TYPE is defined in the
+   * AllocatePages() function description. */
   UINT32 Type;
-  ///
-  /// Physical address of the first byte in the memory region. PhysicalStart must be
-  /// aligned on a 4 KiB boundary, and must not be above 0xfffffffffffff000. Type
-  /// EFI_PHYSICAL_ADDRESS is defined in the AllocatePages() function description
-  ///
+
+  /* Physical address of the first byte in the memory region. PhysicalStart must be
+   * aligned on a 4 KiB boundary, and must not be above 0xFFFFFFFFFFFFF000. Type
+   * EFI_PHYSICAL_ADDRESS is defined in the AllocatePages() function description */
   EFI_PHYSICAL_ADDRESS PhysicalStart;
-  ///
-  /// Virtual address of the first byte in the memory region.
-  /// VirtualStart must be aligned on a 4 KiB boundary,
-  /// and must not be above 0xfffffffffffff000.
-  ///
+
+  /* Virtual address of the first byte in the memory region.
+   * VirtualStart must be aligned on a 4 KiB boundary,
+   * and must not be above 0xFFFFFFFFFFFFF000 */
+
   EFI_VIRTUAL_ADDRESS VirtualStart;
-  ///
-  /// NumberOfPagesNumber of 4 KiB pages in the memory region.
-  /// NumberOfPages must not be 0, and must not be any value
-  /// that would represent a memory page with a start address,
-  /// either physical or virtual, above 0xfffffffffffff000.
-  ///
+  /* NumberOfPagesNumber of 4 KiB pages in the memory region.
+   * NumberOfPages must not be 0, and must not be any value
+   * that would represent a memory page with a start address,
+   * either physical or virtual, above 0xFFFFFFFFFFFFF000 */
+
   UINT64 NumberOfPages;
-  ///
-  /// Attributes of the memory region that describe the bit mask of capabilities
-  /// for that memory region, and not necessarily the current settings for that
-  /// memory region.
-  ///
+  /* Attributes of the memory region that describe the bit mask of capabilities
+   * for that memory region, and not necessarily the current settings for that
+   * memory region. */
+
   UINT64 Attribute;
 } EFI_MEMORY_DESCRIPTOR;
 
@@ -96,19 +91,32 @@ int efi_call_in_32bit_mode(uint32_t func,
                            uint32_t *efi_status);
 
 /* Attribute values */
-#define EFI_MEMORY_UC  ((UINT64)0x0000000000000001ULL) /* uncached */
-#define EFI_MEMORY_WC  ((UINT64)0x0000000000000002ULL) /* write-coalescing */
-#define EFI_MEMORY_WT  ((UINT64)0x0000000000000004ULL) /* write-through */
-#define EFI_MEMORY_WB  ((UINT64)0x0000000000000008ULL) /* write-back */
-#define EFI_MEMORY_UCE ((UINT64)0x0000000000000010ULL) /* uncached, exported */
-#define EFI_MEMORY_WP  ((UINT64)0x0000000000001000ULL) /* write-protect */
-#define EFI_MEMORY_RP  ((UINT64)0x0000000000002000ULL) /* read-protect */
-#define EFI_MEMORY_XP  ((UINT64)0x0000000000004000ULL) /* execute-protect */
-#define EFI_MEMORY_NV  ((UINT64)0x0000000000008000ULL) /* non-volatile */
-#define EFI_MEMORY_MORE_RELIABLE \
-  ((UINT64)0x0000000000010000ULL)                            /* higher reliability */
-#define EFI_MEMORY_RO        ((UINT64)0x0000000000020000ULL) /* read-only */
-#define EFI_MEMORY_RUNTIME   ((UINT64)0x8000000000000000ULL) /* range requires runtime mapping */
+
+/* uncached */
+#define EFI_MEMORY_UC  ((UINT64)0x0000000000000001ULL)
+/* write-coalescing */
+#define EFI_MEMORY_WC  ((UINT64)0x0000000000000002ULL)
+/* write-through */
+#define EFI_MEMORY_WT  ((UINT64)0x0000000000000004ULL)
+/* write-back */
+#define EFI_MEMORY_WB  ((UINT64)0x0000000000000008ULL)
+/* uncached, exported */
+#define EFI_MEMORY_UCE ((UINT64)0x0000000000000010ULL)
+/* write-protect */
+#define EFI_MEMORY_WP  ((UINT64)0x0000000000001000ULL)
+/* read-protect */
+#define EFI_MEMORY_RP  ((UINT64)0x0000000000002000ULL)
+/* execute-protect */
+#define EFI_MEMORY_XP  ((UINT64)0x0000000000004000ULL)
+/* non-volatile */
+#define EFI_MEMORY_NV  ((UINT64)0x0000000000008000ULL)
+/* higher reliability */
+#define EFI_MEMORY_MORE_RELIABLE ((UINT64)0x0000000000010000ULL)
+/* read-only */
+#define EFI_MEMORY_RO        ((UINT64)0x0000000000020000ULL)
+/* range requires runtime mapping */
+#define EFI_MEMORY_RUNTIME   ((UINT64)0x8000000000000000ULL)
+
 #define EFI_MEM_DESC_VERSION 1
 
 #define EFI_PAGE_SHIFT 12

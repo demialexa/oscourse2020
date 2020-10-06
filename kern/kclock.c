@@ -7,29 +7,27 @@ void
 rtc_init(void) {
   nmi_disable();
 
-  uint8_t val;
-
-  // LAB 4: Your code here
-  outb(IO_RTC_CMND, RTC_AREG);
-  val = inb(IO_RTC_DATA);
+  // LAB 4: Your code here:
 
   outb(IO_RTC_CMND, RTC_AREG);
-  outb(IO_RTC_DATA, SET_NEW_RATE(val, RTC_500MS_RATE));
+  uint8_t rga = inb(IO_RTC_DATA);
+  outb(IO_RTC_CMND, RTC_AREG);
+  outb(IO_RTC_DATA, SET_NEW_RATE(rga, RTC_500MS_RATE));
 
   outb(IO_RTC_CMND, RTC_BREG);
-  val = inb(IO_RTC_DATA);
-
+  uint8_t rgb = inb(IO_RTC_DATA);
   outb(IO_RTC_CMND, RTC_BREG);
-  outb(IO_RTC_DATA, val | RTC_PIE);
+  outb(IO_RTC_DATA, rgb | RTC_PIE);
+
+  nmi_enable();
 }
 
 uint8_t
 rtc_check_status(void) {
-  uint8_t status = 0;
-  // LAB 4: Your code here
+  // LAB 4: Your code here:
 
   outb(IO_RTC_CMND, RTC_CREG);
-  status = inb(IO_RTC_DATA);
+  uint8_t status = inb(IO_RTC_DATA);
 
   return status;
 }

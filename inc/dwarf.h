@@ -3,8 +3,8 @@
 #include <inc/types.h>
 #include <inc/string.h>
 
-// <inc/dwarf.h>
-// DWARF4 debugging info
+/* DWARF4 debugging info */
+
 #define DW_TAG_array_type       0x01
 #define DW_TAG_class_type       0x02
 #define DW_TAG_entry_point      0x03
@@ -346,30 +346,30 @@ struct Dwarf_Addrs {
   const unsigned char *pubtypes_end;
 };
 
-// Unaligned read from address `addr`
+/* Unaligned read from address `addr` */
 #define get_unaligned(addr, type) ({          \
   type val;                                   \
   memcpy((void *)&val, (addr), sizeof(type)); \
   val;                                        \
 })
 
-// Write value `val` to unaligned address `addr`
+/* Write value `val` to unaligned address `addr` */
 #define put_unaligned(val, addr) ({                        \
   void *__ptr = (addr);                                    \
   switch (sizeof(*(addr))) {                               \
     case 1:                                                \
-      *(uint8_t *)__ptr = (uint8_t)(val);                  \
+      *(uint8_t *)__ptr = (uint8_t)(uintptr_t)(val);       \
       break;                                               \
     case 2: {                                              \
-      uint16_t __var = (uint16_t)(val);                    \
+      uint16_t __var = (uint16_t)(uintptr_t)(val);         \
       memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
     } break;                                               \
     case 4: {                                              \
-      uint32_t __var = (uint32_t)(val);                    \
+      uint32_t __var = (uint32_t)(uintptr_t)(val);         \
       memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
     } break;                                               \
     case 8: {                                              \
-      uint64_t __var = (uint64_t)(val);                    \
+      uint64_t __var = (uint64_t)(uintptr_t)(val);          \
       memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
     } break;                                               \
     default:                                               \
@@ -379,114 +379,81 @@ struct Dwarf_Addrs {
 })
 
 int info_by_address(const struct Dwarf_Addrs *addrs, uintptr_t p, Dwarf_Off *store);
-int file_name_by_info(const struct Dwarf_Addrs *addrs, Dwarf_Off offset, char *buf, int len, Dwarf_Off *line_off);
+int file_name_by_info(const struct Dwarf_Addrs *addrs, Dwarf_Off offset, char **buf, Dwarf_Off *line_off);
 int line_for_address(const struct Dwarf_Addrs *addrs, uintptr_t p, Dwarf_Off line_offset, int *store);
-int function_by_info(const struct Dwarf_Addrs *addrs, uintptr_t p, Dwarf_Off cu_offset, char *buf, int buflen, uintptr_t *offset);
+int function_by_info(const struct Dwarf_Addrs *addrs, uintptr_t p, Dwarf_Off cu_offset, char **buf, uintptr_t *offset);
 int address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname, uintptr_t *offset);
 int naive_address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname, uintptr_t *offset);
 
-/**
- *	dwarf_entry_len - return the length of an FDE or CIE
- *	@addr: the address of the entry
- *	@len: the length of the entry
+/* dwarf_entry_len - return the length of an FDE or CIE
  *
- *	Read the initial_length field of the entry and store the size of
- *	the entry in @len. We return the number of bytes read. Return a
- *	count of 0 on error.
+ * Read the initial_length field of the entry and store the size of
+ * the entry in @len. We return the number of bytes read. Return a
+ * count of 0 on error
  */
-static inline int
-dwarf_entry_len(const char *addr, unsigned long *len) {
-  uint32_t initial_len;
-  int count;
+static inline uint32_t
+dwarf_entry_len(const uint8_t *addr, uint64_t *len) {
+  uint64_t initial_len = get_unaligned(addr, uint32_t);
+  uint64_t count = sizeof(uint32_t);
 
-  initial_len = get_unaligned(addr, uint32_t);
-  count       = 4;
-
-  /*
-	 * An initial length field value in the range DW_LEN_EXT_LO -
-	 * DW_LEN_EXT_HI indicates an extension, and should not be
-	 * interpreted as a length. The only extension that we currently
-	 * understand is the use of DWARF64 addresses.
-	 */
+  /* An initial length field value in the range DW_LEN_EXT_LO -
+   * DW_LEN_EXT_HI indicates an extension, and should not be
+   * interpreted as a length. The only extension that we currently
+   * understand is the use of DWARF64 addresses */
   if (initial_len >= DW_EXT_LO && initial_len <= DW_EXT_HI) {
-    /*
-		 * The 64-bit length field immediately follows the
-		 * compulsory 32-bit length field.
-		 */
+    /* The 64-bit length field immediately follows the
+     * compulsory 32-bit length field */
     if (initial_len == DW_EXT_DWARF64) {
-      *len  = get_unaligned((uint64_t *)addr + 4, uint64_t);
-      count = 12;
+      *len  = get_unaligned((uint64_t *)addr + sizeof(uint32_t), uint64_t);
+      count += sizeof(uint64_t);
     } else {
       cprintf("Unknown DWARF extension\n");
       count = 0;
     }
-  } else
-    *len = initial_len;
+  } else *len = initial_len;
 
   return count;
 }
 
-// Decode an unsigned LEB128 encoded datum. The algorithm is taken from Appendix C
-// of the DWARF 4 spec. Return the number of bytes read.
-static inline unsigned long
-dwarf_read_uleb128(const char *addr, unsigned int *ret) {
-  unsigned int result;
-  unsigned char byte;
-  int shift, count;
+/* Decode an unsigned LEB128 encoded datum. The algorithm is taken from Appendix C
+ * of the DWARF 4 spec. Return the number of bytes read */
+static inline uint64_t
+dwarf_read_uleb128(const uint8_t *addr, uint64_t *ret) {
+  uint64_t result = 0;
+  size_t shift = 0, count = 0;
+  uint8_t byte;
 
-  result = 0;
-  shift  = 0;
-  count  = 0;
-
-  while (1) {
-    byte = *addr;
-    addr++;
-    count++;
-
-    result |= (byte & 0x7f) << shift;
+  do {
+    byte = *addr++;
+    result |= (byte & 0x7F) << shift;
     shift += 7;
-
-    if (!(byte & 0x80))
-      break;
-  }
+    count++;
+  } while (byte & 0x80);
 
   *ret = result;
-
   return count;
 }
 
-// Decode signed LEB128 data. The Algorithm is taken from Appendix C
-// of the DWARF 4 spec. Return the number of bytes read.
-static inline unsigned long
-dwarf_read_leb128(const char *addr, int *ret) {
-  unsigned char byte;
-  int result, shift;
-  int num_bits;
-  int count;
+/* Decode signed LEB128 data. The Algorithm is taken from Appendix C
+ * of the DWARF 4 spec. Return the number of bytes read */
+static inline uint64_t
+dwarf_read_leb128(const char *addr, int64_t *ret) {
+  size_t shift = 0, count = 0;
+  uint64_t result = 0;
+  uint8_t byte;
 
-  result = 0;
-  shift  = 0;
-  count  = 0;
-
-  while (1) {
-    byte = *addr;
-    addr++;
+  do {
+    byte = *addr++;
     result |= (byte & 0x7f) << shift;
     shift += 7;
     count++;
-
-    if (!(byte & 0x80))
-      break;
-  }
+  } while (byte & 0x80);
 
   /* The number of bits in a signed integer. */
-  num_bits = 8 * sizeof(result);
-
-  if ((shift < num_bits) && (byte & 0x40))
+  if (shift < 8 * sizeof(result) && byte & 0x40)
     result |= (-1U << shift);
 
   *ret = result;
-
   return count;
 }
 #endif

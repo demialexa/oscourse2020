@@ -11,14 +11,14 @@
  * which are relevant to both the kernel and user-mode software.
  */
 
-// Global descriptor numbers
-#define GD_KT   0x08 // kernel text
-#define GD_KD   0x10 // kernel data
-#define GD_KT32 0x18 // kernel text 32bit
-#define GD_KD32 0x20 // kernel data 32bit
-#define GD_UT   0x28 // user text
-#define GD_UD   0x30 // user data
-#define GD_TSS0 0x38 // Task segment selector for CPU 0
+/* Global descriptor numbers */
+#define GD_KT   0x08 /* kernel text */
+#define GD_KD   0x10 /* kernel data */
+#define GD_KT32 0x18 /* kernel text 32bit */
+#define GD_KD32 0x20 /* kernel data 32bit */
+#define GD_UT   0x28 /* user text */
+#define GD_UD   0x30 /* user data */
+#define GD_TSS0 0x38 /* Task segment selector for CPU 0 */
 
 /*
  * Virtual memory map:                                Permissions
@@ -93,29 +93,29 @@
  *     at UTEMP.
  */
 
-// All physical memory mapped at this address
+/* All physical memory mapped at this address */
 #define KERNBASE 0x8040000000
 
-// At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
-// IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
-// at physical address EXTPHYSMEM.
+/* At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
+ * IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
+ * at physical address EXTPHYSMEM. */
 #define IOPHYSMEM  0x0A0000
 #define EXTPHYSMEM 0x100000
 
-// Amount of memory mapped by entrypgdir.
+/* Amount of memory mapped by entrypgdir */
 #define BOOTMEMSIZE (256 * 1024 * 1024)
 
-// Kernel stack.
+/* Kernel stack */
 #define KSTACKTOP KERNBASE
-#define PSTKSIZE  (2 * PGSIZE)  // size of a process stack
-#define KSTKSIZE  (16 * PGSIZE) // size of a kernel stack
-#define KSTKGAP   (8 * PGSIZE)  // size of a kernel stack guard
+#define PSTKSIZE  (2 * PGSIZE)  /* size of a process stack */
+#define KSTKSIZE  (16 * PGSIZE) /* size of a kernel stack */
+#define KSTKGAP   (8 * PGSIZE)  /* size of a kernel stack guard */
 
-// Memory-mapped IO.
+/* Memory-mapped IO */
 #define MMIOLIM  (KSTACKTOP - PTSIZE)
 #define MMIOBASE (MMIOLIM - PTSIZE)
 
-// Memory-mapped FrameBuffer.
+/* Memory-mapped FrameBuffer */
 #define FBUFFBASE (MMIOBASE - FBUFF_SIZE)
 
 #define ULIM (FBUFFBASE)
@@ -125,7 +125,7 @@
  * They are global pages mapped in at env allocation time.
  */
 
-// User read-only virtual page table (see 'uvpt' below)
+/* User read-only virtual page table (see 'uvpt' below) */
 #define UVPT   0x10000000000
 #define UVPD   UVPT + UVPTSIZE
 #define UVPDE  UVPD + UVPDSIZE
@@ -135,37 +135,37 @@
 #define UVPDSIZE   0x400000
 #define UVPDESIZE  0x2000
 #define UVPML4SIZE PGSIZE
-// Read-only copies of the Page structures (sizeof == 400 * PTSIZE so that all
-// struct PageInfo of up to 512GiB pages can fit here).
+/* Read-only copies of the Page structures (sizeof == 400 * PTSIZE so that all
+ * struct PageInfo of up to 512GiB pages can fit here). */
 #define UPAGES (ULIM - UPAGES_SIZE)
-// Read-only copies of the global env structures
+/* Read-only copies of the global env structures */
 #define UENVS (UPAGES - PTSIZE)
 
 /*
  * Top of user VM. User can manipulate VA from UTOP-1 and down!
  */
 
-// Top of user-accessible VM
+/* Top of user-accessible VM */
 #define UTOP 0x8000000000
-// Top of one-page user exception stack
+/* Top of one-page user exception stack */
 #define UXSTACKTOP UTOP
-// Size of exception stack (must be one page for now)
+/* Size of exception stack (must be one page for now) */
 #define UXSTACKSIZE (4 * PGSIZE)
-// Top of normal user stack
-// Next page left invalid to guard against exception stack overflow; then:
+/* Top of normal user stack */
+/* Next page left invalid to guard against exception stack overflow; then: */
 #define USTACKTOP (UXSTACKTOP - UXSTACKSIZE - PGSIZE)
-// Stack size (variable)
+/* Stack size (variable) */
 #define USTACKSIZE (4 * PGSIZE)
 
-// Where user programs generally begin
+/* Where user programs generally begin */
 #define UTEXT (4 * PTSIZE)
 
-// Used for temporary page mappings.  Typed 'void*' for convenience
+/* Used for temporary page mappings.  Typed 'void*' for convenience */
 #define UTEMP ((void *)(2 * PTSIZE))
-// Used for temporary page mappings for the user page-fault handler
-// (should not conflict with other temporary page mappings)
+/* Used for temporary page mappings for the user page-fault handler
+ * (should not conflict with other temporary page mappings) */
 #define PFTEMP (UTEMP + PTSIZE - PGSIZE)
-// The location of the user-level STABS data structure
+/* The location of the user-level STABS data structure */
 #define USTABDATA (PTSIZE)
 
 #ifndef __ASSEMBLER__
@@ -190,10 +190,10 @@ typedef uint64_t pte_t;
  * will always be available at virtual address (UVPT + (UVPT >> PGSHIFT)), to
  * which uvpd is set in entry.S.
  */
-extern volatile pte_t uvpt[];      // VA of "virtual page table"
-extern volatile pde_t uvpd[];      // VA of current page directory
-extern volatile pdpe_t uvpde[];    // VA of current page directory pointer
-extern volatile pml4e_t uvpml4e[]; // VA of current page map level 4
+extern volatile pte_t uvpt[];      /* VA of "virtual page table" */
+extern volatile pde_t uvpd[];      /* VA of current page directory */
+extern volatile pdpe_t uvpde[];    /* VA of current page directory pointer */
+extern volatile pml4e_t uvpml4e[]; /* VA of current page map level 4 */
 #endif
 
 /*
@@ -206,14 +206,16 @@ extern volatile pml4e_t uvpml4e[]; // VA of current page map level 4
  * You can map a struct PageInfo * to the corresponding physical address
  * with page2pa() in kern/pmap.h.
  */
+
 struct PageInfo {
-  // Next page on the free list.
+  /* Next page on the free list */
   struct PageInfo *pp_link;
 
-  // pp_ref is the count of pointers (usually in page table entries)
-  // to this page, for pages allocated using page_alloc.
-  // Pages allocated at boot time using pmap.c's
-  // boot_alloc do not have valid reference count fields.
+  /* pp_ref is the count of pointers (usually in page table entries)
+   * to this page, for pages allocated using page_alloc.
+   * Pages allocated at boot time using pmap.c's
+   * boot_alloc do not have valid reference count fields
+   */
 
   uint16_t pp_ref;
 };

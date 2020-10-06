@@ -9,7 +9,7 @@ typedef uintptr_t physaddr_t;
 typedef ptrdiff_t ssize_t;
 typedef int32_t off_t;
 
-// Efficient min and max operations
+/* Efficient min and max operations */
 #ifndef MIN
 #define MIN(_a, _b)         \
   ({                        \
@@ -28,14 +28,15 @@ typedef int32_t off_t;
   })
 #endif
 
-// Rounding operations (efficient when n is a power of 2)
-// Round down to the nearest multiple of n
+/* Rounding operations (efficient when n is a power of 2)
+ * Round down to the nearest multiple of n */
 #define ROUNDDOWN(a, n)           \
   ({                              \
     uint64_t __a = (uint64_t)(a); \
     (typeof(a))(__a - __a % (n)); \
   })
-// Round up to the nearest multiple of n
+
+/* Round up to the nearest multiple of n */
 #define ROUNDUP(a, n)                                     \
   ({                                                      \
     uint64_t __n = (uint64_t)(n);                         \

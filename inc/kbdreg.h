@@ -1,7 +1,7 @@
 #ifndef JOS_KBDREG_H
 #define JOS_KBDREG_H
 
-// Special keycodes
+/* Special keycodes */
 #define KEY_HOME 0xE0
 #define KEY_END  0xE1
 #define KEY_UP   0xE2
