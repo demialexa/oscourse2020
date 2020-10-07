@@ -25,7 +25,7 @@ timers_init(void) {
   timertab[4] = timer_hpet1;
 
   for (int i = 0; i < MAX_TIMERS; i++) {
-    if (timertab[i].timer_init != NULL) {
+    if (timertab[i].timer_init) {
       timertab[i].timer_init();
     }
   }
@@ -34,7 +34,7 @@ timers_init(void) {
 void
 timers_schedule(const char *name) {
   for (int i = 0; i < MAX_TIMERS; i++) {
-    if (timertab[i].timer_name != NULL && strcmp(timertab[i].timer_name, name) == 0) {
+    if (timertab[i].timer_name && !strcmp(timertab[i].timer_name, name)) {
       if (!timertab[i].enable_interrupts) {
         panic("Timer %s does not support interrupts\n", name);
       }
@@ -133,10 +133,6 @@ i386_init(void) {
   /* Choose the timer used for scheduling: hpet or pit */
   timers_schedule("hpet0");
   clock_idt_init();
-
-  pic_init();
-  rtc_init();
-
 
 #ifdef CONFIG_KSPACE
   /* Touch all you want */

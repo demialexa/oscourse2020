@@ -14,7 +14,7 @@ static bool pic_initilalized;
 void
 pic_init(void) {
 
-  // mask all interrupts
+  /* mask all interrupts */
   outb(IO_PIC1_DATA, 0xFF);
   outb(IO_PIC2_DATA, 0xFF);
 
