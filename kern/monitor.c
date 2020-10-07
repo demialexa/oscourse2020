@@ -11,6 +11,8 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/tsc.h>
+#include <kern/timer.h>
 #include <kern/env.h>
 
 /* enough for one VGA text line */
@@ -27,6 +29,8 @@ struct Command {
   int (*func)(int argc, char **argv, struct Trapframe *tf);
 };
 
+// LAB 5: Your code here.
+// Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
 static struct Command commands[] = {
     {"help", "Display this list of commands", mon_help},
     {"hello", "Display greeting message", mon_hello},
@@ -90,10 +94,10 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   return 0;
 }
 
-
+// LAB 5: Your code here.
+// Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
 
 /* Kernel monitor command interpreter */
-
 
 static int
 runcmd(char *buf, struct Trapframe *tf) {
