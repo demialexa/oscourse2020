@@ -78,7 +78,7 @@ save_trapframe:
   pushq %r15
 
   xor %ebp, %ebp
-  movq  %rsp, %rdi
+  movq %rsp, %rdi
   jmp *save_trapframe_ret(%rip)
 
 .globl sys_yield

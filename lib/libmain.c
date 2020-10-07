@@ -1,5 +1,5 @@
-// Called from entry.S to get us going.
-// entry.S already took care of defining envs, pages, uvpd, and uvpt.
+/* Called from entry.S to get us going.
+ * entry.S already took care of defining envs, pages, uvpd, and uvpt */
 
 #include <inc/lib.h>
 
@@ -16,14 +16,13 @@ void
 libmain(int argc, char **argv) {
   thisenv = 0;
 
-  // save the name of the program so that panic() can use it
-  if (argc > 0)
-    binaryname = argv[0];
+  /* save the name of the program so that panic() can use it */
 
-  // call user main routine
+  if (argc > 0) binaryname = argv[0];
+
+  /* call user main routine */
   umain(argc, argv);
 
-  // exit
 #ifdef JOS_PROG
   sys_exit();
 #endif
