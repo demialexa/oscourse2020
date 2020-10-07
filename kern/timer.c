@@ -18,9 +18,9 @@
 #define ULONG_MAX ~0UL
 
 #if LAB <= 6
-// Early variant of memory mapping that does 1:1 aligned area mapping
-// in 2MB pages. You will need to reimplement this code with proper
-// virtual memory mapping in the future.
+/* Early variant of memory mapping that does 1:1 aligned area mapping
+ * in 2MB pages. You will need to reimplement this code with proper
+ * virtual memory mapping in the future. */
 static void *
 mmio_map_region(physaddr_t pa, size_t size) {
   void map_addr_early_boot(uintptr_t addr, uintptr_t addr_phys, size_t sz);
@@ -74,10 +74,10 @@ check_sum(void *Table, int type) {
     default:
       break;
   }
-  for (int i = 0; i < len; i++)
+  for (int i = 0; i < len; i++) {
     sum += ((uint8_t *)Table)[i];
-  if (sum % 0x100 == 0)
-    return 1;
+  }
+  if (!(sum % 0x100)) return 1;
   return 0;
 }
 
@@ -89,47 +89,44 @@ acpi_enable(void) {
   }
 }
 
-// Obtain RSDP ACPI table address from bootloader.
+/* Obtain RSDP ACPI table address from bootloader. */
 RSDP *
 get_rsdp(void) {
   static void *krsdp = NULL;
 
-  if (krsdp != NULL)
-    return krsdp;
+  if (krsdp != NULL) return krsdp;
 
-  if (uefi_lp->ACPIRoot == 0)
-    panic("No rsdp\n");
+  if (!uefi_lp->ACPIRoot) panic("No rsdp\n");
 
   krsdp = mmio_map_region(uefi_lp->ACPIRoot, sizeof(RSDP));
   return krsdp;
 }
 
 // LAB 5: Your code here.
-// Obtain and map FADT ACPI table address.
+/* Obtain and map FADT ACPI table address. */
 FADT *
 get_fadt(void) {
   return NULL;
 }
 
 // LAB 5: Your code here.
-// Obtain and map RSDP ACPI table address.
+/* Obtain and map RSDP ACPI table address. */
 HPET *
 get_hpet(void) {
   return NULL;
 }
 
-// Getting physical HPET timer address from its table.
+/* Getting physical HPET timer address from its table. */
 HPETRegister *
 hpet_register(void) {
   HPET *hpet_timer = get_hpet();
-  if (hpet_timer->address.address == 0)
-    panic("hpet is unavailable\n");
+  if (!hpet_timer->address.address) panic("hpet is unavailable\n");
 
   uintptr_t paddr = hpet_timer->address.address;
   return mmio_map_region(paddr, sizeof(HPETRegister));
 }
 
-// Debug HPET timer state.
+/* Debug HPET timer state. */
 void
 hpet_print_struct(void) {
   HPET *hpet = get_hpet();
@@ -159,28 +156,28 @@ hpet_print_struct(void) {
 }
 
 static volatile HPETRegister *hpetReg;
-// HPET timer period (in femtoseconds)
+/* HPET timer period (in femtoseconds) */
 static uint64_t hpetFemto = 0;
-// HPET timer frequency
+/* HPET timer frequency */
 static uint64_t hpetFreq = 0;
 
-// HPET timer initialisation
+/* HPET timer initialisation */
 void
 hpet_init() {
   if (hpetReg == NULL) {
     nmi_disable();
     hpetReg   = hpet_register();
     hpetFemto = (uintptr_t)(hpetReg->GCAP_ID >> 32);
-    // cprintf("hpetFemto = %llu\n", hpetFemto);
+    /* cprintf("hpetFemto = %llu\n", hpetFemto); */
     hpetFreq = (1 * Peta) / hpetFemto;
-    // cprintf("HPET: Frequency = %d.%03dMHz\n", (uintptr_t)(hpetFreq / Mega), (uintptr_t)(hpetFreq % Mega));
-    // Enable ENABLE_CNF bit to enable timer.
+    /* cprintf("HPET: Frequency = %d.%03dMHz\n", (uintptr_t)(hpetFreq / Mega), (uintptr_t)(hpetFreq % Mega)); */
+    /* Enable ENABLE_CNF bit to enable timer. */
     hpetReg->GEN_CONF |= 1;
     nmi_enable();
   }
 }
 
-// HPET register contents debugging.
+/* HPET register contents debugging. */
 void
 hpet_print_reg(void) {
   cprintf("GCAP_ID = %016lx\n", (unsigned long)hpetReg->GCAP_ID);
@@ -198,19 +195,18 @@ hpet_print_reg(void) {
   cprintf("TIM2_FSB = %016lx\n", (unsigned long)hpetReg->TIM2_FSB);
 }
 
-// HPET main timer counter value.
+/* HPET main timer counter value. */
 uint64_t
 hpet_get_main_cnt(void) {
   return hpetReg->MAIN_CNT;
 }
 
-// LAB 5: Your code here.
-// - Configure HPET timer 0 to trigger every 0.5 seconds
-// on IRQ_TIMER line.
-// - Configure HPET timer 1 to trigger every 1.5 seconds
-// on IRQ_CLOCK line.
-// Hint: to be able to use HPET as PIT replacement consult
-// LegacyReplacement functionality in HPET spec.
+/* - Configure HPET timer 0 to trigger every 0.5 seconds on IRQ_TIMER line
+ * - Configure HPET timer 1 to trigger every 1.5 seconds on IRQ_CLOCK line
+ * 
+ * HINT To be able to use HPET as PIT replacement consult
+ *      LegacyReplacement functionality in HPET spec. */
+// LAB 5: Your code here:
 
 void
 hpet_enable_interrupts_tim0(void) {
@@ -230,10 +226,10 @@ hpet_handle_interrupts_tim1(void) {
   pic_send_eoi(IRQ_CLOCK);
 }
 
-// LAB 5: Your code here.
-// Calculate CPU frequency in Hz with the help with HPET timer.
-// Hint: use hpet_get_main_cnt function and do not forget about
-// about pause instruction.
+/* Calculate CPU frequency in Hz with the help with HPET timer.
+ * HINT Use hpet_get_main_cnt function and do not forget about
+ * about pause instruction. */
+// LAB 5: Your code here:
 uint64_t
 hpet_cpu_frequency(void) {
   return 0;
@@ -247,10 +243,10 @@ pmtimer_get_timeval(void) {
 
 #define PM_FREQ 3579545
 
-// LAB 5: Your code here.
-// Calculate CPU frequency in Hz with the help with ACPI PowerManagement timer.
-// Hint: use pmtimer_get_timeval function and do not forget that ACPI PM timer
-// can be 24-bit or 32-bit.
+/* Calculate CPU frequency in Hz with the help with ACPI PowerManagement timer.
+ * HINT Use pmtimer_get_timeval function and do not forget that ACPI PM timer
+ *      can be 24-bit or 32-bit. */
+// LAB 5: Your code here:
 uint64_t
 pmtimer_cpu_frequency(void) {
   return 0;
