@@ -27,12 +27,13 @@ check_list(void) {
 void *
 test_alloc(uint8_t nbytes) {
   Header *p;
-  unsigned nunits;
 
   /* Make allocator thread-safe with the help of spin_lock/spin_unlock. */
   // LAB 5: Your code here:
 
-  nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
+  spin_lock(&kernel_lock);
+
+  size_t nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
 
   /* no free list yet */
   if (!freep) {
@@ -65,7 +66,10 @@ test_alloc(uint8_t nbytes) {
     }
 
     /* wrapped around free list */
-    if (p == freep) return NULL;
+    if (p == freep) {
+      spin_unlock(&kernel_lock);
+      return NULL;
+    }
   }
 }
 
@@ -76,7 +80,9 @@ test_free(void *ap) {
   Header *bp = (Header *)ap - 1;
 
   // Make allocator thread-safe with the help of spin_lock/spin_unlock.
-  // LAB 5: Your code here.
+  // LAB 5: Your code here:
+
+  spin_lock(&kernel_lock);
 
   /* freed block at start or end of arena */
   Header *p = freep;
@@ -104,4 +110,6 @@ test_free(void *ap) {
   freep = p;
 
   check_list();
+
+  spin_unlock(&kernel_lock);
 }
