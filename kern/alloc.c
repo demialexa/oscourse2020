@@ -6,24 +6,21 @@
 #define SPACE_SIZE 5 * 0x1000
 
 static uint8_t space[SPACE_SIZE];
-static Header base = {.s = {.next = (Header *)space, .prev = (Header *)space, .size = 0}}; /* empty list to get started */
 
-static Header *freep = NULL; /* start of free list */
+/* empty list to get started */
+static Header base = {.next = (Header *)space, .prev = (Header *)space };
+/* start of free list */
+static Header *freep = NULL;
 
 static void
 check_list(void) {
-  Header *p, *prevp;
-  __asm __volatile("cli;");
-  prevp = freep;
-  for (p = prevp->s.next; p != freep; p = p->s.next) {
-    if (prevp != p->s.prev) {
-      panic("Corrupted list.\n");
-      for (;;) {
-      }
-    }
+  asm volatile("cli");
+  Header *prevp = freep, *p = prevp->next;
+  for (; p != freep; p = p->next) {
+    if (prevp != p->prev) panic("Corrupted list.\n");
     prevp = p;
   }
-  __asm __volatile("sti;");
+  asm volatile("sti");
 }
 
 /* malloc: general-purpose storage allocator */
@@ -32,69 +29,77 @@ test_alloc(uint8_t nbytes) {
   Header *p;
   unsigned nunits;
 
-  // Make allocator thread-safe with the help of spin_lock/spin_unlock.
-  // LAB 5: Your code here.
+  /* Make allocator thread-safe with the help of spin_lock/spin_unlock. */
+  // LAB 5: Your code here:
 
   nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
 
-  if (freep == NULL) { /* no free list yet */
-    ((Header *)&space)->s.next = (Header *)&base;
-    ((Header *)&space)->s.prev = (Header *)&base;
-    ((Header *)&space)->s.size = (SPACE_SIZE - sizeof(Header)) / sizeof(Header);
-    freep                      = &base;
+  /* no free list yet */
+  if (!freep) {
+    Header *hd = (Header*)&space;
+
+    hd->next = (Header *)&base;
+    hd->prev = (Header *)&base;
+    hd->size = (SPACE_SIZE - sizeof(Header)) / sizeof(Header);
+
+    freep = &base;
   }
 
   check_list();
 
-  for (p = freep->s.next;; p = p->s.next) {
-    if (p->s.size >= nunits) { /* big enough */
-      freep = p->s.prev;
-      if (p->s.size == nunits) { /* exactly */
-        (p->s.prev)->s.next = p->s.next;
-        (p->s.next)->s.prev = p->s.prev;
+  for (p = freep->next;; p = p->next) {
+    /* big enough */
+    if (p->size >= nunits) {
+      freep = p->prev;
+      /* exactly */
+      if (p->size == nunits) {
+        (p->prev)->next = p->next;
+        (p->next)->prev = p->prev;
       } else { /* allocate tail end */
-        p->s.size -= nunits;
-        p += p->s.size;
-        p->s.size = nunits;
+        p->size -= nunits;
+        p += p->size;
+        p->size = nunits;
       }
       spin_unlock(&kernel_lock);
       return (void *)(p + 1);
     }
-    if (p == freep) { /* wrapped around free list */
-      return NULL;
-    }
+
+    /* wrapped around free list */
+    if (p == freep) return NULL;
   }
 }
 
 /* free: put block ap in free list */
 void
 test_free(void *ap) {
-  Header *bp, *p;
-  bp = (Header *)ap - 1; /* point to block header */
+  /* point to block header */
+  Header *bp = (Header *)ap - 1;
 
   // Make allocator thread-safe with the help of spin_lock/spin_unlock.
   // LAB 5: Your code here.
 
-  for (p = freep; !(bp > p && bp < p->s.next); p = p->s.next)
-    if (p >= p->s.next && (bp > p || bp < p->s.next))
-      break;                                                 /* freed block at start or end of arena */
-  if (bp + bp->s.size == p->s.next && p + p->s.size == bp) { /* join to both */
-    p->s.size += bp->s.size + p->s.next->s.size;
-    p->s.next->s.next->s.prev = p;
-    p->s.next                 = p->s.next->s.next;
-  } else if (bp + bp->s.size == p->s.next) { /* join to upper nbr */
-    bp->s.size += p->s.next->s.size;
-    bp->s.next                = p->s.next->s.next;
-    bp->s.prev                = p->s.next->s.prev;
-    p->s.next->s.next->s.prev = bp;
-    p->s.next                 = bp;
-  } else if (p + p->s.size == bp) { /* join to lower nbr */
-    p->s.size += bp->s.size;
+  /* freed block at start or end of arena */
+  Header *p = freep;
+  for (; !(bp > p && bp < p->next); p = p->next)
+    if (p >= p->next && (bp > p || bp < p->next)) break;
+
+  if (bp + bp->size == p->next && p + p->size == bp) /* join to both */ {
+    p->size += bp->size + p->next->size;
+    p->next->next->prev = p;
+    p->next = p->next->next;
+  } else if (bp + bp->size == p->next) /* join to upper nbr */ {
+    bp->size += p->next->size;
+    bp->next = p->next->next;
+    bp->prev = p->next->prev;
+    p->next->next->prev = bp;
+    p->next = bp;
+  } else if (p + p->size == bp) /* join to lower nbr */ {
+    p->size += bp->size;
   } else {
-    bp->s.next        = p->s.next;
-    bp->s.prev        = p;
-    p->s.next->s.prev = bp;
-    p->s.next         = bp;
+    bp->next = p->next;
+    bp->prev = p;
+    p->next->prev = bp;
+    p->next = bp;
   }
   freep = p;
 

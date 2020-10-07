@@ -1,17 +1,20 @@
 #ifndef JOS_INC_ALLOC_H
 #define JOS_INC_ALLOC_H
 
-typedef long Align; /* for alignment to long boundary */
+#include <inc/types.h>
 
-union header { /* block header */
-  struct {
-    union header *next; /* next block */
-    union header *prev; /* prev block */
-    unsigned size;      /* size of this block */
-  } s;
-  Align x; /* force alignment of blocks */
+/* block header */
+struct header {
+  /* next block */
+  struct header *next;
+  /* prev block */
+  struct header *prev;
+  /* force alignment of blocks */
+  _Alignas(_Alignof(long))
+  /* size of this block */
+  size_t size;
 } __attribute__((packed));
 
-typedef union header Header;
+typedef struct header Header;
 
 #endif
