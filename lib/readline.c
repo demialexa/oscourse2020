@@ -1,39 +1,41 @@
 #include <inc/stdio.h>
 #include <inc/error.h>
+#include <inc/types.h>
 
 #define BUFLEN 1024
+
 static char buf[BUFLEN];
 
 char *
 readline(const char *prompt) {
-  int i, c, echoing;
+  if (prompt) cprintf("%s", prompt);
 
-  if (prompt != NULL)
-    cprintf("%s", prompt);
+  bool echo = iscons(0);
 
-  i       = 0;
-  echoing = iscons(0);
-  while (1) {
-    c = getchar();
+  for (size_t i = 0;;) {
+    int c = getchar();
+
     if (c < 0) {
       cprintf("read error: %i\n", c);
       return NULL;
-    } else if ((c == '\b' || c == '\x7f')) {
-      if (i > 0) {
-        if (echoing) {
-          cputchar('\b');
-          cputchar(' ');
-          cputchar('\b');
-        }
-        i--;
+    }
+
+    if ((c == '\b' || c == '\x7F') && i) {
+      if (echo) {
+        cputchar('\b');
+        cputchar(' ');
+        cputchar('\b');
       }
+      i--;
     } else if (c >= ' ' && i < BUFLEN - 1) {
-      if (echoing)
+      if (echo) {
         cputchar(c);
+      }
       buf[i++] = (char)c;
     } else if (c == '\n' || c == '\r') {
-      if (echoing)
+      if (echo) {
         cputchar('\n');
+      }
       buf[i] = 0;
       return buf;
     }
