@@ -102,19 +102,21 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
 
 int
 mon_start(int argc, char **argv, struct Trapframe *tf) {
-  //TODO
+  if (argc < 2) return 1;
+  timer_start(argv[1]);
   return 0;
 }
 
 int
 mon_stop(int argc, char **argv, struct Trapframe *tf) {
-  //TODO
+  timer_stop();
   return 0;
 }
 
 int
 mon_frequency(int argc, char **argv, struct Trapframe *tf) {
-  //TODO
+  if (argc < 2) return 1;
+  timer_cpu_frequency(argv[1]);
   return 0;
 }
 
