@@ -5,11 +5,10 @@
 #include <inc/x86.h>
 #include <inc/memlayout.h>
 #include <inc/string.h>
-#include <kern/cpu.h>
 #include <kern/spinlock.h>
 #include <kern/kdebug.h>
 
-// The big kernel lock
+/* The big kernel lock */
 struct spinlock kernel_lock = {
 #ifdef DEBUG_SPINLOCK
     .name = "kernel_lock"
@@ -17,21 +16,18 @@ struct spinlock kernel_lock = {
 };
 
 #ifdef DEBUG_SPINLOCK
-// Record the current call stack in pcs[] by following the %rbp chain.
+/* Record the current call stack in pcs[] by following the %rbp chain. */
 static void
 get_caller_pcs(uint64_t pcs[]) {
-  uint64_t *rbp;
-  int i;
+  uintptr_t *rbp = (uintptr_t *)read_rbp();
 
-  rbp = (uint64_t *)read_rbp();
+  int i;
   for (i = 0; i < 10; i++) {
-    if (rbp == 0 || rbp < (uint64_t *)ULIM)
-      break;
-    pcs[i] = rbp[1];             // saved %eip
-    rbp    = (uint64_t *)rbp[0]; // saved %rbp
+    if (rbp == 0 || rbp < (uintptr_t *)ULIM) break;
+    pcs[i] = rbp[1]; /* saved %rip */
+    rbp = (uinptr_t *)rbp[0]; /* saved %rbp */
   }
-  for (; i < 10; i++)
-    pcs[i] = 0;
+  while (i < 10) pcs[i++] = 0;
 }
 
 // Check whether this CPU is holding the lock.
@@ -49,37 +45,35 @@ __spin_initlock(struct spinlock *lk, char *name) {
 #endif
 }
 
-// Acquire the lock.
-// Loops (spins) until the lock is acquired.
-// Holding a lock for a long time may cause
-// other CPUs to waste time spinning to acquire it.
+/* Acquire the lock.
+ * Loops (spins) until the lock is acquired.
+ * Holding a lock for a long time may cause
+ * other CPUs to waste time spinning to acquire it. */
 void
 spin_lock(struct spinlock *lk) {
 #ifdef DEBUG_SPINLOCK
-  if (holding(lk))
-    panic("Cannot acquire %s: already holding", lk->name);
+  if (holding(lk)) panic("Cannot acquire %s: already holding", lk->name);
 #endif
 
-  // The xchg is atomic.
-  // It also serializes, so that reads after acquire are not
-  // reordered before it.
-  while (xchg(&lk->locked, 1) != 0)
-    asm volatile("pause");
+  /* The xchg is atomic.
+   * It also serializes, so that reads after acquire are not
+   * reordered before it. */
+  while (xchg(&lk->locked, 1)) asm volatile("pause");
 
-    // Record info about lock acquisition for debugging.
+    /* Record info about lock acquisition for debugging. */
 #ifdef DEBUG_SPINLOCK
   get_caller_pcs(lk->pcs);
 #endif
 }
 
-// Release the lock.
+/* Release the lock. */
 void
 spin_unlock(struct spinlock *lk) {
 #ifdef DEBUG_SPINLOCK
   if (!holding(lk)) {
     int i;
     uintptr_t pcs[10];
-    // Nab the acquiring EIP chain before it gets released
+    /* Nab the acquiring EIP chain before it gets released */
     memmove(pcs, lk->pcs, sizeof pcs);
     cprintf("Cannot release %s\nAcquired at:", lk->name);
     for (i = 0; i < 10 && pcs[i]; i++) {
@@ -98,14 +92,14 @@ spin_unlock(struct spinlock *lk) {
   lk->pcs[0] = 0;
 #endif
 
-  // The xchg serializes, so that reads before release are
-  // not reordered after it.  The 1996 PentiumPro manual (Volume 3,
-  // 7.2) says reads can be carried out speculatively and in
-  // any order, which implies we need to serialize here.
-  // But the 2007 Intel 64 Architecture Memory Ordering White
-  // Paper says that Intel 64 and IA-32 will not move a load
-  // after a store. So lock->locked = 0 would work here.
-  // The xchg being asm volatile ensures gcc emits it after
-  // the above assignments (and after the critical section).
+ /* The xchg serializes, so that reads before release are
+  * not reordered after it.  The 1996 PentiumPro manual (Volume 3,
+  * 7.2) says reads can be carried out speculatively and in
+  * any order, which implies we need to serialize here.
+  * But the 2007 Intel 64 Architecture Memory Ordering White
+  * Paper says that Intel 64 and IA-32 will not move a load
+  * after a store. So lock->locked = 0 would work here.
+  * The xchg being asm volatile ensures gcc emits it after
+  * the above assignments (and after the critical section). */
   xchg(&lk->locked, 0);
 }

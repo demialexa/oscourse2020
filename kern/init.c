@@ -35,12 +35,12 @@ void
 timers_schedule(const char *name) {
   for (int i = 0; i < MAX_TIMERS; i++) {
     if (timertab[i].timer_name != NULL && strcmp(timertab[i].timer_name, name) == 0) {
-      if (timertab[i].enable_interrupts != NULL) {
-        timer_for_schedule = &timertab[i];
-        timertab[i].enable_interrupts();
-      } else {
+      if (!timertab[i].enable_interrupts) {
         panic("Timer %s does not support interrupts\n", name);
       }
+
+      timer_for_schedule = &timertab[i];
+      timertab[i].enable_interrupts();
       return;
     }
   }
@@ -158,7 +158,7 @@ const char *panicstr = NULL;
 
 /* Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", and then enters the kernel monitor. */
-void
+_Noreturn void
 _panic(const char *file, int line, const char *fmt, ...) {
   va_list ap;
 

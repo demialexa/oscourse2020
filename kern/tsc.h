@@ -3,7 +3,7 @@
 #ifndef JOS_KERN_TSC_H
 #define JOS_KERN_TSC_H
 #ifndef JOS_KERNEL
-#error "This is a JOS kernel header; user programs should not #include it"
+#    error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
 uint64_t tsc_calibrate(void);
