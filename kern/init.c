@@ -121,6 +121,8 @@ i386_init(void) {
   void (**ctor)() = &__ctors_start;
   while (ctor < &__ctors_end) (*ctor++)();
 
+  pic_init();
+  clock_idt_init();
   timers_init();
 
   /* Framebuffer init should be done after memory init */
@@ -132,7 +134,6 @@ i386_init(void) {
 
   /* Choose the timer used for scheduling: hpet or pit */
   timers_schedule("hpet0");
-  clock_idt_init();
 
 #ifdef CONFIG_KSPACE
   /* Touch all you want */

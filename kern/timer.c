@@ -234,10 +234,10 @@ hpet_init() {
     /* cprintf("hpetFemto = %llu\n", hpetFemto); */
     hpetFreq = (1 * Peta) / hpetFemto;
     /* cprintf("HPET: Frequency = %d.%03dMHz\n", (uintptr_t)(hpetFreq / Mega), (uintptr_t)(hpetFreq % Mega)); */
-    /* Enable ENABLE_CNF bit to enable timer
-     * and LegacyReplacement routing */
-    hpetReg->GEN_CONF |= HPET_ENABLE_CNF | HPET_LEG_RT_CAP;
+    /* Enable ENABLE_CNF bit to enable timer */
+    hpetReg->GEN_CONF |= HPET_ENABLE_CNF;
     nmi_enable();
+
   }
 }
 
@@ -280,6 +280,8 @@ hpet_get_main_cnt(void) {
 
 void
 hpet_enable_interrupts_tim0(void) {
+  hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
+
   uint64_t cap = hpetReg->TIM0_CONF;
   if (!(cap & HPET_TN_SIZE_CAP))
     panic("HPET timer 0 does not support 64-bit mode");
@@ -287,21 +289,27 @@ hpet_enable_interrupts_tim0(void) {
     panic("HPET timer 0 does not support periodic mode");
 
   hpetReg->TIM0_CONF = (IRQ_TIMER << 9) | HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF | HPET_TN_VAL_SET_CNF;
-  hpetReg->TIM0_COMP = hpetReg->MAIN_CNT + Peta/2;
-  hpetReg->TIM0_COMP = Peta/2;
+  hpetReg->TIM0_COMP = hpet_get_main_cnt() + Peta/2/hpetFemto;
+  hpetReg->TIM0_COMP = Peta/2/hpetFemto;
+
+  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_TIMER));
 }
 
 void
 hpet_enable_interrupts_tim1(void) {
-  uint64_t cap = hpetReg->TIM0_CONF;
+  hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
+
+  uint64_t cap = hpetReg->TIM1_CONF;
   if (!(cap & HPET_TN_SIZE_CAP))
     panic("HPET timer 0 does not support 64-bit mode");
   if (!(cap & HPET_TN_PER_INT_CAP))
     panic("HPET timer 0 does not support periodic mode");
 
   hpetReg->TIM1_CONF = (IRQ_CLOCK << 9) | HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF | HPET_TN_VAL_SET_CNF;
-  hpetReg->TIM0_COMP = hpetReg->MAIN_CNT + 3*Peta/2;
-  hpetReg->TIM0_COMP = 3*Peta/2;
+  hpetReg->TIM1_COMP = hpet_get_main_cnt() + 3*Peta/2/hpetFemto;
+  hpetReg->TIM1_COMP = 3*Peta/2/hpetFemto;
+
+  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
 }
 
 void
