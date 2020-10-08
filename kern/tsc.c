@@ -192,19 +192,54 @@ print_timer_error(void) {
 // Use print_time function to print timert result.
 // Use print_timer_error function to print error.
 static bool timer_started = 0;
-static int timer_id       = -1;
-static uint64_t timer     = 0;
+static int timer_id = -1;
+static uint64_t timer = 0;
+
 void
 timer_start(const char *name) {
-  (void) timer_started;
-  (void) timer_id;
-  (void) timer;
+  for (int i = 0; i < MAX_TIMERS; i++) {
+    if (timertab[i].timer_name && !strcmp(timertab[i].timer_name, name)) {
+      if (!timertab[i].enable_interrupts) {
+        cprintf("Timer Error\n");
+        cprintf("Timer %s does not support interrupts\n", name);
+        return;
+      }
+
+      timertab[i].enable_interrupts();
+      timer_id = i;
+      timer_started = 1;
+      return;
+    }
+  }
+
+  timer = read_tsc();
+
+  cprintf("Timer Error\n");
+  cprintf("Timer %s does not exist\n", name);
 }
 
 void
 timer_stop(void) {
+  if (!timer_started || timer_id < 0) {
+    print_timer_error();
+    return;
+  }
+
+  print_time((read_tsc() - timer)/timertab[timer_id].get_cpu_freq());
+
+  timer_id = -1;
+  timer_started = 0;
 }
 
 void
 timer_cpu_frequency(const char *name) {
+  for (int i = 0; i < MAX_TIMERS; i++) {
+    if (timertab[i].timer_name && !strcmp(timertab[i].timer_name, name)) {
+      cprintf("%lu", timertab[i].get_cpu_freq());
+      return;
+    }
+  }
+  cprintf("Timer Error\n");
+  cprintf("Timer %s does not exist\n", name);
+
 }
