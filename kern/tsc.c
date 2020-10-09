@@ -194,6 +194,7 @@ print_timer_error(void) {
 static bool timer_started = 0;
 static int timer_id = -1;
 static uint64_t timer = 0;
+static uint64_t freq = 0;
 
 void
 timer_start(const char *name) {
@@ -202,6 +203,7 @@ timer_start(const char *name) {
       timer_id = i;
       timer_started = 1;
       timer = read_tsc();
+      freq = timertab[timer_id].get_cpu_freq();
       return;
     }
   }
@@ -217,7 +219,7 @@ timer_stop(void) {
     return;
   }
 
-  print_time((read_tsc() - timer)/timertab[timer_id].get_cpu_freq());
+  print_time((read_tsc() - timer)/freq);
 
   timer_id = -1;
   timer_started = 0;

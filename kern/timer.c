@@ -357,7 +357,7 @@ pmtimer_get_timeval(void) {
 // LAB 5: Your code here:
 uint64_t
 pmtimer_cpu_frequency(void) {
-  uint32_t time_res = 10;
+  uint32_t time_res = 100;
   uint32_t tick0 = pmtimer_get_timeval();
   uint64_t delta = 0, target = PM_FREQ / time_res;
 
