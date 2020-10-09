@@ -26,7 +26,6 @@ check_list(void) {
 /* malloc: general-purpose storage allocator */
 void *
 test_alloc(uint8_t nbytes) {
-  Header *p;
 
   /* Make allocator thread-safe with the help of spin_lock/spin_unlock. */
   // LAB 5: Your code here:
@@ -48,14 +47,14 @@ test_alloc(uint8_t nbytes) {
 
   check_list();
 
-  for (p = freep->next;; p = p->next) {
+  for (Header *p = freep->next;; p = p->next) {
     /* big enough */
     if (p->size >= nunits) {
       freep = p->prev;
       /* exactly */
       if (p->size == nunits) {
-        (p->prev)->next = p->next;
-        (p->next)->prev = p->prev;
+        p->prev->next = p->next;
+        p->next->prev = p->prev;
       } else { /* allocate tail end */
         p->size -= nunits;
         p += p->size;
