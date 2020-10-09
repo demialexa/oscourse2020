@@ -31,6 +31,7 @@ save_trapframe_trap:
   # Guard to avoid hard to debug errors due to cli misusage.
   orl $FL_IF, (%rsp)
   popq saved_rflags(%rip)
+  popq %rsp
   jmp save_trapframe
 
 # For grade tests to work...
@@ -40,7 +41,7 @@ save_trapframe_syscall:
   popq save_trapframe_ret(%rip)
   popq saved_rip(%rip)
   pushfq
-  movl $GD_KT, saved_cs(%rip)
+  movq $GD_KT, saved_cs(%rip)
   popq %rax
   # Guard to avoid hard to debug errors due to cli misusage.
   orq $FL_IF, %rax
