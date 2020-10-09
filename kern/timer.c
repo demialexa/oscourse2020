@@ -330,7 +330,7 @@ hpet_handle_interrupts_tim1(void) {
 uint64_t
 hpet_cpu_frequency(void) {
   uint64_t time_res = 100;
-  uint64_t delta = 0, target = Peta / time_res;
+  uint64_t delta = 0, target = hpetFreq / time_res;
 
   uint64_t tick0 = hpet_get_main_cnt();
   uint64_t tsc0 = read_tsc();

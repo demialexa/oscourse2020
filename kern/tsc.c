@@ -199,20 +199,12 @@ void
 timer_start(const char *name) {
   for (int i = 0; i < MAX_TIMERS; i++) {
     if (timertab[i].timer_name && !strcmp(timertab[i].timer_name, name)) {
-      if (!timertab[i].enable_interrupts) {
-        cprintf("Timer Error\n");
-        cprintf("Timer %s does not support interrupts\n", name);
-        return;
-      }
-
-      timertab[i].enable_interrupts();
       timer_id = i;
       timer_started = 1;
+      timer = read_tsc();
       return;
     }
   }
-
-  timer = read_tsc();
 
   cprintf("Timer Error\n");
   cprintf("Timer %s does not exist\n", name);
@@ -235,7 +227,7 @@ void
 timer_cpu_frequency(const char *name) {
   for (int i = 0; i < MAX_TIMERS; i++) {
     if (timertab[i].timer_name && !strcmp(timertab[i].timer_name, name)) {
-      cprintf("%lu", timertab[i].get_cpu_freq());
+      cprintf("%lu\n", timertab[i].get_cpu_freq());
       return;
     }
   }
