@@ -210,7 +210,7 @@ read_rbp(void) {
 static inline uint64_t
 read_rsp(void) {
   uint64_t esp;
-  asm volatile("movl %%rsp,%0" : "=r"(esp));
+  asm volatile("movq %%rsp,%0" : "=r"(esp));
   return esp;
 }
 
