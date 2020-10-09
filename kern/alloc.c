@@ -76,13 +76,13 @@ test_alloc(uint8_t nbytes) {
 /* free: put block ap in free list */
 void
 test_free(void *ap) {
+  spin_lock(&kernel_lock);
+
   /* point to block header */
   Header *bp = (Header *)ap - 1;
 
   // Make allocator thread-safe with the help of spin_lock/spin_unlock.
   // LAB 5: Your code here:
-
-  spin_lock(&kernel_lock);
 
   /* freed block at start or end of arena */
   Header *p = freep;
