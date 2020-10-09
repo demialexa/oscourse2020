@@ -138,7 +138,6 @@ static void *acpi_find_table(const char *sign) {
   for (size_t i = 0; i < krsdt_len; i++) {
     /* Assume little endian */
     uint64_t fadt_pa = 0;
-    cprintf("R---%lu\n", krsdt_entsz);
     memcpy(&fadt_pa, (uint8_t *)krsdt->PointerToOtherSDT + i*krsdt_entsz, krsdt_entsz);
 
     hd = mmio_map_region(fadt_pa, sizeof(ACPISDTHeader));
