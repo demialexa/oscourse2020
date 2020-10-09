@@ -28,10 +28,9 @@ save_trapframe_trap:
   popq save_trapframe_ret(%rip)
   popq saved_rip(%rip)
   popq saved_cs(%rip)
-  # Guard to avoid hard to debug errors due to cli misusage.
-  orl $FL_IF, (%rsp)
   popq saved_rflags(%rip)
-  popq %rsp
+  popq saved_rsp(%rip)
+  popq saved_ss(%rip)
   jmp save_trapframe
 
 # For grade tests to work...
@@ -40,23 +39,21 @@ _generall_syscall:
 save_trapframe_syscall:
   popq save_trapframe_ret(%rip)
   popq saved_rip(%rip)
+  movq %rsp, saved_rsp(%rip)
   pushfq
+  movq $GD_KD, saved_ss(%rip)
   movq $GD_KT, saved_cs(%rip)
-  popq %rax
-  # Guard to avoid hard to debug errors due to cli misusage.
-  orq $FL_IF, %rax
-  movq %rax, saved_rflags(%rip)
+  popq saved_rflags(%rip)
   # fallthrough
 
 save_trapframe:
-  movq %rsp, saved_rsp(%rip)
-  leaq bootstacktop(%rip), %rsp
+  # Guard to avoid hard to debug errors due to cli misusage.
+  orl $FL_IF, saved_rflags(%rip)
 
-  pushq $GD_KD
-  pushq saved_rsp(%rip)
-  pushq saved_rflags(%rip)
-  pushq saved_cs(%rip)
-  pushq saved_rip(%rip)
+  # We already pushed ss,rsp,rflags,cs,rip
+  # implicitly
+  leaq (bootstacktop-0x28)(%rip), %rsp
+
   pushq $0x0
   pushq $0x0
   pushq $0x0 # %ds
@@ -113,15 +110,14 @@ bootstacktop:
 
 # Provide storage for loader parameters.
 .globl uefi_lp
-.global saved_rip
-.global saved_rflags
-.global saved_cs
-
 uefi_lp: .quad 0
+
 save_trapframe_ret: .quad 0
-saved_rip: .quad 0
-saved_rsp: .quad 0
-saved_rflags: .quad 0
-saved_cs: .quad 0
+
+.set saved_ss, bootstacktop-0x8
+.set saved_rsp, bootstacktop-0x10
+.set saved_rflags, bootstacktop-0x18
+.set saved_cs, bootstacktop-0x20
+.set saved_rip, bootstacktop-0x28
 
 #endif
