@@ -313,17 +313,17 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
             return -E_INVALID_EXE;
           }
 
-          uintptr_t addr = find_function(name);
-
-          cprintf("Bind function '%s' to %p\n", name, (void *)addr);
-
           if (syms[j].st_value < image_start || syms[j].st_value > image_end) {
             cprintf("Symbol value points outside program image: %p\n",
                     (uint8_t *)syms[j].st_value);
             return -E_INVALID_EXE;
           }
 
-          if (addr) memcpy((void *)syms[j].st_value, &addr, sizeof(void *));
+          uintptr_t addr = find_function(name);
+          if (addr) {
+            cprintf("Bind function '%s' to %p\n", name, (void *)addr);
+            memcpy((void *)syms[j].st_value, &addr, sizeof(void *));
+          }
         }
       }
     }
