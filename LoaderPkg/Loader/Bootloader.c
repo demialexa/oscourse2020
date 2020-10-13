@@ -93,7 +93,7 @@ InitGraphics (
   EFI_GRAPHICS_OUTPUT_PROTOCOL  *GraphicsOutput;
 
 #if 1
-  UINT32 i = 0;
+  UINT32 i;
   UINTN InfoBufferSize;
   EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *InfoBuffer;
 #endif
@@ -130,24 +130,22 @@ InitGraphics (
   InfoBuffer = AllocatePool(InfoBufferSize);
   for (i=0; i<GraphicsOutput->Mode->MaxMode; i++) {
     GraphicsOutput->QueryMode (GraphicsOutput, i, &InfoBufferSize, &InfoBuffer);
-	if (InfoBuffer->HorizontalResolution == hr &&
-	  InfoBuffer->VerticalResolution ==	vr
-	) {
+    if (InfoBuffer->HorizontalResolution == hr &&
+        InfoBuffer->VerticalResolution ==	vr
+    ) {
       Status = GraphicsOutput->SetMode (GraphicsOutput, i);
-	  if (EFI_ERROR(Status)) {
-		  DEBUG ((DEBUG_INFO, "Error setting resolution\n"));
-		  return Status;
-	  } else {
-		  DEBUG ((DEBUG_INFO, "Resolution: %ux%u\n", hr, vr));
-		  break;
-	  }
-	}
+      if (EFI_ERROR(Status)) {
+        DEBUG ((DEBUG_INFO, "Error setting resolution\n"));
+        return Status;
+      } else {
+        DEBUG ((DEBUG_INFO, "Resolution: %ux%u\n", hr, vr));
+        break;
+      }
+    }
   }
   FreePool(InfoBuffer);
 #endif
 
-  // GraphicsOutput->SetMode(GraphicsOutput)
-  //
   // Fill screen with black.
   //
   GraphicsOutput->Blt (
