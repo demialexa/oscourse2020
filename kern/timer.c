@@ -103,7 +103,7 @@ static void *acpi_find_table(const char *sign) {
     if (strncmp(krsdp->Signature, "RSD PTR ", 8)) panic("RSDP is invalid");
 
     for (size_t i = 0; i < offsetof(RSDP, Length); i++)
-      cksm += ((uint8_t*)krsdp)[i];
+      cksm = (uint8_t)(cksm + ((uint8_t*)krsdp)[i]);
     if (cksm) panic("RSDP is invalid");
 
     uint64_t rsdt_pa = krsdp->RsdtAddress;
@@ -111,7 +111,7 @@ static void *acpi_find_table(const char *sign) {
     if (krsdp->Revision) {
       /* ACPI version >= 2.0 */
       for (size_t i = 0; i < krsdp->Length; i++)
-        cksm += ((uint8_t*)krsdp)[i];
+        cksm = (uint8_t)(cksm + ((uint8_t*)krsdp)[i]);
       if (cksm) panic("RSDP is invalid");
 
       rsdt_pa = krsdp->XsdtAddress;
@@ -123,7 +123,7 @@ static void *acpi_find_table(const char *sign) {
     krsdt = mmio_map_region(rsdt_pa, krsdt->h.Length);
 
     for (size_t i = 0; i < krsdt->h.Length; i++)
-      cksm += ((uint8_t*)krsdt)[i];
+      cksm = (uint8_t)(cksm + ((uint8_t*)krsdt)[i]);
     if (cksm) panic("RSDT is invalid");
 
     if (strncmp(krsdt->h.Signature, krsdp->Revision ?
@@ -145,7 +145,7 @@ static void *acpi_find_table(const char *sign) {
     hd = mmio_map_region(fadt_pa, hd->Length);
 
     for (size_t i = 0; i < hd->Length; i++)
-      cksm += ((uint8_t*)hd)[i];
+      cksm = (uint8_t)(cksm + ((uint8_t*)hd)[i]);
     if (cksm) panic("ACPI table '%.4s' is invalid", hd->Signature);
     if (!strncmp(hd->Signature, sign, 4)) return hd;
   }

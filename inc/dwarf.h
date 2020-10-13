@@ -425,7 +425,7 @@ dwarf_read_uleb128(const uint8_t *addr, uint64_t *ret) {
 
   do {
     byte = *addr++;
-    result |= (byte & 0x7F) << shift;
+    result |= (byte & 0x7FULL) << shift;
     shift += 7;
     count++;
   } while (byte & 0x80);
@@ -444,7 +444,7 @@ dwarf_read_leb128(const char *addr, int64_t *ret) {
 
   do {
     byte = *addr++;
-    result |= (byte & 0x7f) << shift;
+    result |= (byte & 0x7FULL) << shift;
     shift += 7;
     count++;
   } while (byte & 0x80);
