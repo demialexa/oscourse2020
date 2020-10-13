@@ -428,7 +428,7 @@ dwarf_read_uleb128(const uint8_t *addr, uint64_t *ret) {
     result |= (byte & 0x7FULL) << shift;
     shift += 7;
     count++;
-  } while (byte & 0x80);
+  } while (byte & 0x80 && shift < 64);
 
   *ret = result;
   return count;
@@ -447,7 +447,7 @@ dwarf_read_leb128(const char *addr, int64_t *ret) {
     result |= (byte & 0x7FULL) << shift;
     shift += 7;
     count++;
-  } while (byte & 0x80);
+  } while (byte & 0x80 && shift < 64);
 
   /* The number of bits in a signed integer. */
   if (shift < 8 * sizeof(result) && byte & 0x40)
