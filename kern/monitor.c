@@ -58,11 +58,11 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf) {
   extern char _head64[], entry[], etext[], edata[], end[];
 
   cprintf("Special kernel symbols:\n");
-  cprintf("  _head64                  %08lx (phys)\n", (unsigned long)_head64);
-  cprintf("  entry  %08lx (virt)  %08lx (phys)\n", (unsigned long)entry, (unsigned long)entry - KERNBASE);
-  cprintf("  etext  %08lx (virt)  %08lx (phys)\n", (unsigned long)etext, (unsigned long)etext - KERNBASE);
-  cprintf("  edata  %08lx (virt)  %08lx (phys)\n", (unsigned long)edata, (unsigned long)edata - KERNBASE);
-  cprintf("  end    %08lx (virt)  %08lx (phys)\n", (unsigned long)end, (unsigned long)end - KERNBASE);
+  cprintf("  _head64 %16lx (virt)  %16lx (phys)\n", (unsigned long)_head64, (unsigned long)_head64);
+  cprintf("  entry   %16lx (virt)  %16lx (phys)\n", (unsigned long)entry, (unsigned long)entry - KERNBASE);
+  cprintf("  etext   %16lx (virt)  %16lx (phys)\n", (unsigned long)etext, (unsigned long)etext - KERNBASE);
+  cprintf("  edata   %16lx (virt)  %16lx (phys)\n", (unsigned long)edata, (unsigned long)edata - KERNBASE);
+  cprintf("  end     %16lx (virt)  %16lx (phys)\n", (unsigned long)end, (unsigned long)end - KERNBASE);
   cprintf("Kernel executable memory footprint: %luKB\n", (unsigned long)ROUNDUP(end - entry, 1024) / 1024);
   return 0;
 }
