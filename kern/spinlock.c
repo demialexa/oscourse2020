@@ -30,7 +30,7 @@ get_caller_pcs(uint64_t pcs[]) {
   while (i < 10) pcs[i++] = 0;
 }
 
-// Check whether this CPU is holding the lock.
+/* Check whether this CPU is holding the lock. */
 static int
 holding(struct spinlock *lock) {
   return lock->locked;

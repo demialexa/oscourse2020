@@ -1,5 +1,5 @@
-// Simple command-line kernel monitor useful for
-// controlling the kernel and exploring the system interactively.
+/* Simple command-line kernel monitor useful for
+ * controlling the kernel and exploring the system interactively. */
 
 #include <inc/stdio.h>
 #include <inc/string.h>
@@ -15,12 +15,8 @@
 #include <kern/timer.h>
 #include <kern/env.h>
 
-/* enough for one VGA text line */
-#define CMDBUF_SIZE 80 
-
 #define WHITESPACE "\t\r\n "
 #define MAXARGS    16
-
 
 struct Command {
   const char *name;
@@ -29,8 +25,8 @@ struct Command {
   int (*func)(int argc, char **argv, struct Trapframe *tf);
 };
 
-// LAB 5: Your code here.
 // Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
+// LAB 5: Your code here:
 static struct Command commands[] = {
     {"help", "Display this list of commands", mon_help},
     {"hello", "Display greeting message", mon_hello},
@@ -97,8 +93,8 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   return 0;
 }
 
-// LAB 5: Your code here.
 // Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
+// LAB 5: Your code here:
 
 int
 mon_start(int argc, char **argv, struct Trapframe *tf) {
@@ -135,7 +131,7 @@ runcmd(char *buf, struct Trapframe *tf) {
     while (*buf && strchr(WHITESPACE, *buf)) *buf++ = 0;
     if (!*buf) break;
 
-    // save and scan past next arg
+    /* save and scan past next arg */
     if (argc == MAXARGS - 1) {
       cprintf("Too many arguments (max %d)\n", MAXARGS);
       return 0;
@@ -145,7 +141,7 @@ runcmd(char *buf, struct Trapframe *tf) {
   }
   argv[argc] = NULL;
 
-  // Lookup and invoke the command
+  /* Lookup and invoke the command */
   if (!argc) return 0;
   for (size_t i = 0; i < NCOMMANDS; i++) {
     if (strcmp(argv[0], commands[i].name) == 0)
