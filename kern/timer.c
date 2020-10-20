@@ -60,27 +60,6 @@ struct Timer timer_acpipm = {
     .get_cpu_freq = pmtimer_cpu_frequency,
 };
 
-bool
-check_sum(void *Table, int type) {
-  int sum      = 0;
-  uint32_t len = 0;
-  switch (type) {
-    case 0:
-      len = ((RSDP *)Table)->Length;
-      break;
-    case 1:
-      len = ((ACPISDTHeader *)Table)->Length;
-      break;
-    default:
-      break;
-  }
-  for (int i = 0; i < len; i++) {
-    sum += ((uint8_t *)Table)[i];
-  }
-  if (!(sum % 0x100)) return 1;
-  return 0;
-}
-
 void
 acpi_enable(void) {
   FADT *fadt = get_fadt();
