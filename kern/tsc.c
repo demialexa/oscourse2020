@@ -17,7 +17,6 @@ struct Timer timer_pit = {
     .get_cpu_freq = tsc_calibrate
 };
 
-unsigned long cpu_freq;
 /*
  * This reads the current MSB of the PIT counter, and
  * checks if we are running on sufficiently fast and

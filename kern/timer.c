@@ -307,19 +307,24 @@ hpet_handle_interrupts_tim1(void) {
 // LAB 5: Your code here:
 uint64_t
 hpet_cpu_frequency(void) {
-  uint64_t time_res = 100;
-  uint64_t delta = 0, target = hpetFreq / time_res;
+  static uint64_t cpu_freq;
 
-  uint64_t tick0 = hpet_get_main_cnt();
-  uint64_t tsc0 = read_tsc();
-  do {
-    asm("pause");
-    delta = hpet_get_main_cnt() - tick0;
-  } while (delta < target);
+  if (!cpu_freq) {
+    uint64_t time_res = 100;
+    uint64_t delta = 0, target = hpetFreq / time_res;
 
-  uint64_t tsc1 = read_tsc();
+    uint64_t tick0 = hpet_get_main_cnt();
+    uint64_t tsc0 = read_tsc();
+    do {
+      asm("pause");
+      delta = hpet_get_main_cnt() - tick0;
+    } while (delta < target);
 
-  return (tsc1 - tsc0) * time_res;
+    uint64_t tsc1 = read_tsc();
+    cpu_freq = (tsc1 - tsc0) * time_res;
+  }
+
+  return cpu_freq;
 }
 
 uint32_t
@@ -336,24 +341,30 @@ pmtimer_get_timeval(void) {
 // LAB 5: Your code here:
 uint64_t
 pmtimer_cpu_frequency(void) {
-  uint32_t time_res = 100;
-  uint32_t tick0 = pmtimer_get_timeval();
-  uint64_t delta = 0, target = PM_FREQ / time_res;
+  static uint64_t cpu_freq;
 
-  uint64_t tsc0 = read_tsc();
+  if (!cpu_freq) {
+    uint32_t time_res = 100;
+    uint32_t tick0 = pmtimer_get_timeval();
+    uint64_t delta = 0, target = PM_FREQ / time_res;
 
-  do {
-    asm("pause");
-    uint32_t tick1 = pmtimer_get_timeval();
-    delta = tick1 - tick0;
-    if (-delta <= 0xFFFFFF) {
-      delta += 0xFFFFFF;
-    } else if (tick0 > tick1) {
-      delta += 0xFFFFFFFF;
-    }
-  } while (delta < target);
+    uint64_t tsc0 = read_tsc();
 
-  uint64_t tsc1 = read_tsc();
+    do {
+      asm("pause");
+      uint32_t tick1 = pmtimer_get_timeval();
+      delta = tick1 - tick0;
+      if (-delta <= 0xFFFFFF) {
+        delta += 0xFFFFFF;
+      } else if (tick0 > tick1) {
+        delta += 0xFFFFFFFF;
+      }
+    } while (delta < target);
 
-  return (tsc1 - tsc0) * PM_FREQ / delta;
+    uint64_t tsc1 = read_tsc();
+
+    cpu_freq = (tsc1 - tsc0) * PM_FREQ / delta;
+  }
+
+  return cpu_freq;
 }
