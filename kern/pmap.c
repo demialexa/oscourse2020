@@ -407,7 +407,7 @@ page_free(struct PageInfo *pp) {
   if (pp->pp_ref || pp->pp_link)
     panic("page_free: Page cannot be freed!\n");
 
-  pp->pp_link    = page_free_list;
+  pp->pp_link = page_free_list;
   page_free_list = pp;
   if (!page_free_list_top) {
     page_free_list_top = pp;
@@ -576,8 +576,22 @@ mmio_map_region(physaddr_t pa, size_t size) {
 
   // LAB 6: Your code here:
 
-  (void)base;
-  return NULL;
+  uintptr_t pa2 = ROUNDDOWN(pa, PGSIZE);
+
+  if (base + pa2 + size >= MMIOLIM)
+      panic("Allocated MMIO address is too high: [0x%016lu;0x%016lu]", pa, pa + size);
+
+  size = ROUNDUP(size + (pa - pa2), PGSIZE);
+
+  /* TODO: Well, I don't like the fact that mapping one address
+   * twice in a row results in two different mappings... */
+
+  boot_map_region(kern_pml4e, base + pa2, size, pa2, PTE_PCD | PTE_PWT | PTE_W);
+
+  void *new = (void *)base;
+  base += size;
+
+  return new;
 }
 
 
