@@ -3,6 +3,7 @@
 #include <kern/env.h>
 #include <kern/monitor.h>
 
+
 struct Taskstate cpu_ts;
 _Noreturn void sched_halt(void);
 
@@ -25,6 +26,7 @@ sched_yield(void) {
 
   // LAB 3: Your code here:
 
+#ifdef CONFIG_KSPACE
   /* If no current environment,
    * start scanning from the beginning of array */
   int id   = curenv ? ENVX(curenv_getid()) : -1;
@@ -38,6 +40,7 @@ sched_yield(void) {
       env_run(envs + id);
     }
   } while (id != orig);
+#endif
 
   cprintf("Halt\n");
 
@@ -77,3 +80,4 @@ sched_halt(void) {
   /* Unreachable */
   for(;;);
 }
+

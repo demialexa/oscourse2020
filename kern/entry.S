@@ -1,6 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef CONFIG_KSPACE
 
 #include <inc/mmu.h>
 #include <inc/memlayout.h>
@@ -23,6 +22,7 @@ entry:
   jmp .
 
 
+#ifdef CONFIG_KSPACE
 .global save_trapframe_trap
 save_trapframe_trap:
   popq save_trapframe_ret(%rip)
@@ -97,6 +97,8 @@ sys_exit:
   call csys_exit
   jmp .
 
+#endif
+
 .data
 
 
@@ -120,4 +122,3 @@ save_trapframe_ret: .quad 0
 .set saved_cs, bootstacktop-0x20
 .set saved_rip, bootstacktop-0x28
 
-#endif

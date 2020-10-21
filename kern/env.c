@@ -13,8 +13,6 @@
 #include <kern/sched.h>
 #include <kern/kdebug.h>
 
-#ifdef CONFIG_KSPACE
-
 static struct Env env_array[NENV];
 /* Free environment list
  * (linked by Env->env_link) */
@@ -159,6 +157,7 @@ env_init(void) {
   env_init_percpu();
 }
 
+#ifdef CONFIG_KSPACE
 
 /* Allocates and initializes a new environment.
  * On success, the new environment is stored in *newenv_store.
