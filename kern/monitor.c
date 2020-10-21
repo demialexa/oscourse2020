@@ -26,9 +26,6 @@ struct Command {
   int (*func)(int argc, char **argv, struct Trapframe *tf);
 };
 
-// Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
-// LAB 6: Your code here.
-// Implement memory (mon_memory) command.
 static struct Command commands[] = {
     {"help", "Display this list of commands", mon_help},
     {"hello", "Display greeting message", mon_hello},
@@ -36,7 +33,8 @@ static struct Command commands[] = {
     {"backtrace", "Print stack backtrace", mon_backtrace},
     {"timer_start", "Start timer",  mon_start},
     {"timer_stop", "Stop timer", mon_stop},
-    {"timer_freq", "Get timer frequency", mon_frequency}
+    {"timer_freq", "Get timer frequency", mon_frequency},
+    {"memory", "Display allocated memory pages", mon_memory},
 };
 #define NCOMMANDS (sizeof(commands) / sizeof(commands[0]))
 
@@ -120,6 +118,20 @@ mon_frequency(int argc, char **argv, struct Trapframe *tf) {
 
 // LAB 6: Your code here.
 // Implement memory (mon_memory) commands.
+int
+mon_memory(int argc, char **argv, struct Trapframe *tf) {
+    bool region = !pages[0].pp_ref;
+    size_t npg = 1, pgi = 0;
+    for (size_t i = 0; i < npages; i++) {
+        if (region == !!pages[i].pp_ref || i == npages - 1) {
+            if (pgi + 1 != i) cprintf("%lu..", pgi + 1);
+            cprintf("%lu %s  \n", i, (const char *[]){"ALLOCATED", "FREE"}[region]);
+            region = !pages[i].pp_ref;
+            npg = 0, pgi = i;
+        }
+    }
+    return 0;
+}
 
 
 /* Kernel monitor command interpreter */
