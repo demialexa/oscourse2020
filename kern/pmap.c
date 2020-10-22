@@ -20,14 +20,8 @@ void *__nosan_memset(void *, int, size_t);
 
 extern uint64_t pml4phys;
 
-/* These variables are set by i386_detect_memory() */
-
 /* Amount of physical memory (in pages) */
 size_t npages;
-/* Amount of base memory (in pages) */
-static size_t npages_basemem;
-
-/* These variables are set in mem_init() */
 
 /* Kernel's initial page directory */
 pde_t *kern_pml4e;
@@ -37,35 +31,11 @@ physaddr_t kern_cr3;
 struct PageInfo *pages;
 /* Free list of physical pages */
 static struct PageInfo *page_free_list = NULL;
-/* Pointers to start and end of UEFI memory map */
-EFI_MEMORY_DESCRIPTOR *mmap_base = NULL;
-EFI_MEMORY_DESCRIPTOR *mmap_end  = NULL;
-size_t mem_map_size = 0;
 
 
 
 /* Detect machine's physical memory setup */
 
-
-
-/* Count all available to the system pages (checks for avaiability should be done in page_init) */
-static void
-load_params_read(LOADER_PARAMS *desc, size_t *npages_basemem, size_t *npages_extmem) {
-  EFI_MEMORY_DESCRIPTOR *mmap_curr;
-  size_t num_pages = 0;
-  mem_map_size = desc->MemoryMapDescriptorSize;
-  mmap_base = (EFI_MEMORY_DESCRIPTOR *)(uintptr_t)desc->MemoryMap;
-  mmap_end = (EFI_MEMORY_DESCRIPTOR *)((uintptr_t)desc->MemoryMap + desc->MemoryMapSize);
-  mmap_curr = mmap_base;
-
-  while (mmap_curr < mmap_end) {
-    num_pages += mmap_curr->NumberOfPages;
-    mmap_curr = (EFI_MEMORY_DESCRIPTOR *)((uintptr_t)mmap_curr + mem_map_size);
-  }
-
-  *npages_basemem = num_pages > (IOPHYSMEM / PGSIZE) ? IOPHYSMEM / PGSIZE : num_pages;
-  *npages_extmem  = num_pages - *npages_basemem;
-}
 
 #define KiB 1024
 #define MiB (KiB*KiB)
@@ -73,25 +43,32 @@ load_params_read(LOADER_PARAMS *desc, size_t *npages_basemem, size_t *npages_ext
 
 static void
 i386_detect_memory(void) {
-  size_t npages_extmem;
-  size_t pextmem;
+  size_t npages_extmem, npages_basemem;
 
   if (uefi_lp && uefi_lp->MemoryMap) {
-    load_params_read(uefi_lp, &npages_basemem, &npages_extmem);
+    npages = 0;
+
+    EFI_MEMORY_DESCRIPTOR *start = (void *)uefi_lp->MemoryMap;
+    EFI_MEMORY_DESCRIPTOR *end = (void *)(uefi_lp->MemoryMap + uefi_lp->MemoryMapSize);
+    for (; start < end;) {
+      npages += start->NumberOfPages;
+      start = (void *)((uint8_t *)start + uefi_lp->MemoryMapDescriptorSize);
+    }
+
+    npages_basemem = npages > (IOPHYSMEM / PGSIZE) ? IOPHYSMEM / PGSIZE : npages;
+    npages_extmem  = npages - npages_basemem;
   } else {
     /* Use CMOS calls to measure available base & extended memory
      * (CMOS calls return results in kilobytes) */
     npages_basemem = mc146818_read16(NVRAM_BASELO) * KiB / PGSIZE;
     npages_extmem = mc146818_read16(NVRAM_EXTLO) * KiB / PGSIZE;
-    pextmem = (size_t)mc146818_read16(NVRAM_PEXTLO) * KiB * 64;
-    if (pextmem) {
-      npages_extmem = (16 * MiB + pextmem - MiB) / PGSIZE;
-    }
-  }
+    size_t pextmem = (size_t)mc146818_read16(NVRAM_PEXTLO) * KiB * 64;
+    if (pextmem) npages_extmem = (16 * MiB + pextmem - MiB) / PGSIZE;
 
-  /* Calculate the number of physical pages available in both base
-   * and extended memory. */
-  npages = npages_extmem ? (EXTPHYSMEM / PGSIZE) + npages_extmem : npages_basemem;
+    /* Calculate the number of physical pages
+     * available in both base and extended memory. */
+    npages = npages_extmem ? (EXTPHYSMEM / PGSIZE) + npages_extmem : npages_basemem;
+  }
 
   cprintf("Physical memory: %luM available, base = %luK, extended = %luK\n",
           (unsigned long)(npages * PGSIZE / MiB),
@@ -102,8 +79,6 @@ i386_detect_memory(void) {
 /* Fix loading params and memory map address to virtual ones */
 static void
 fix_lp_addresses(void) {
-  mmap_base = (EFI_MEMORY_DESCRIPTOR *)(uintptr_t)uefi_lp->MemoryMapVirt;
-  mmap_end = (EFI_MEMORY_DESCRIPTOR *)((uintptr_t)uefi_lp->MemoryMapVirt + uefi_lp->MemoryMapSize);
   uefi_lp = (LOADER_PARAMS *)uefi_lp->SelfVirtual;
 }
 
@@ -175,7 +150,7 @@ boot_alloc(uint32_t n) {
  * Above ULIM the user cannot read or write. */
 void
 mem_init(void) {
-  /* Find out how much memory the machine has (npages & npages_basemem). */
+  /* Find out how much memory the machine has (npages). */
   i386_detect_memory();
 
   /* Remove this line when you're ready to test this function. */
@@ -229,21 +204,21 @@ kasan_mem_init(void) {
       platform_asan_unpoison(page2kva(&pages[pgidx]), PGSIZE);
 
   /* Additinally map all UEFI runtime services corresponding shadow memory. */
-  for (EFI_MEMORY_DESCRIPTOR *mmap_curr = mmap_base; mmap_curr < mmap_end; ) {
-    uintptr_t virt_addr = ROUNDDOWN((uintptr_t)((mmap_curr->VirtualStart >> 3) + SANITIZE_SHADOW_OFF), PGSIZE);
-    uintptr_t virt_end  = ROUNDUP((uintptr_t)(virt_addr + (mmap_curr->NumberOfPages * PGSIZE >> 3)), PGSIZE);
+  EFI_MEMORY_DESCRIPTOR *start = (void *)uefi_lp->MemoryMap;
+  EFI_MEMORY_DESCRIPTOR *end = (void *)((uint8_t *)start + uefi_lp->MemoryMapSize);
+  for (; start < end; start = (void *)((uint8_t *)start + uefi_lp->MemoryMapDescriptorSize)) {
+    uintptr_t virt_addr = ROUNDDOWN((uintptr_t)((start->VirtualStart >> 3) + SANITIZE_SHADOW_OFF), PGSIZE);
+    uintptr_t virt_end  = ROUNDUP((uintptr_t)(virt_addr + (start->NumberOfPages * PGSIZE >> 3)), PGSIZE);
 
-    if (mmap_curr->Attribute & EFI_MEMORY_RUNTIME) {
+    if (start->Attribute & EFI_MEMORY_RUNTIME) {
       for (; virt_addr < virt_end; virt_addr += PGSIZE) {
         struct PageInfo *pg = page_alloc(ALLOC_ZERO);
         if (!pg) panic("region_alloc: page alloc failed!\n");
 
         int res = page_insert(kern_pml4e, pg, (void *)virt_addr, PTE_P | PTE_W);
-
         if (res < 0) panic("Cannot allocate any memory for page directory allocation");
       }
     }
-    mmap_curr = (EFI_MEMORY_DESCRIPTOR *)((uintptr_t)mmap_curr + mem_map_size);
   }
 }
 #endif
@@ -280,14 +255,15 @@ mark_reserved(void) {
   while(start_p < end_p) reserve(&pages[start_p++]);
 
   /* Mark pages reserved by UEFI if memory map is present */
-  if (mmap_base && mmap_end) {
-    for (EFI_MEMORY_DESCRIPTOR *mmap_curr = mmap_base; mmap_curr < mmap_end; ) {
-      if (is_reserved_region(mmap_curr)) {
-        start_p = ((uintptr_t)mmap_curr->PhysicalStart >> EFI_PAGE_SHIFT);
-        end_p = start_p + mmap_curr->NumberOfPages;
+  if (uefi_lp && uefi_lp->MemoryMap) {
+    EFI_MEMORY_DESCRIPTOR *start = (void *)uefi_lp->MemoryMap;
+    EFI_MEMORY_DESCRIPTOR *end = (void *)((uint8_t *)start + uefi_lp->MemoryMapSize);
+    for (; start < end; start = (void *)((uint8_t *)start + uefi_lp->MemoryMapDescriptorSize)) {
+      if (is_reserved_region(start)) {
+        start_p = ((uintptr_t)start->PhysicalStart >> EFI_PAGE_SHIFT);
+        end_p = start_p + start->NumberOfPages;
         while(start_p < end_p) reserve(&pages[start_p++]);
       }
-      mmap_curr = (EFI_MEMORY_DESCRIPTOR *)((uintptr_t)mmap_curr + mem_map_size);
     }
   }
 }
@@ -325,7 +301,6 @@ page_init(void) {
   mark_reserved();
 
   /* Then assemble free list */
-  struct PageInfo *prev = NULL;
   struct PageInfo **ind = &page_free_list;
   for (size_t i = 0; i < npages; i++) {
     if (!pages[i].pp_ref) {
@@ -333,7 +308,7 @@ page_init(void) {
       ind = &pages[i].pp_link;
     }
   }
-  prev->pp_link = NULL;
+  *ind = NULL;
 }
 
 /* Allocates a physical page.  If (alloc_flags & ALLOC_ZERO), fills the entire
@@ -379,8 +354,6 @@ page_is_allocated(const struct PageInfo *pp) {
 void
 page_decref(struct PageInfo *pp) {
   // LAB 6: Fill this function in
-  // Hint: You may want to panic if pp->pp_ref is nonzero or
-  // pp->pp_link is not NULL.
 
   if (!pp->pp_ref || pp->pp_link)
     panic("page_decref: Page cannot be freed!\n");
@@ -422,10 +395,10 @@ page_free(struct PageInfo *pp) {
  *
  * Hint 3: look at inc/mmu.h for useful macros that mainipulate page
  * table and page directory entries. */
-pdpe_t *
-pml4e_walk(pml4e_t *pml4e, const void *va, int create) {
+
+static pte_t *
+lookup_alloc_ent(pte_t *ent, int create) {
   // LAB 7: Fill this function in
-  pte_t *ent = &pml4e[PML4(va)];
   pdpe_t *res = NULL;
 
   if ((*ent & PTE_P)) res = KADDR(PTE_ADDR(*ent));
@@ -440,40 +413,20 @@ pml4e_walk(pml4e_t *pml4e, const void *va, int create) {
   return res;
 }
 
-pde_t *
-pdpe_walk(pdpe_t *pdpe, const void *va, int create) {
+/* Find page table item */
+static pte_t *
+pte_lookup(pml4e_t *pml4e, void *va, bool alloc) {
   // LAB 7: Fill this function in
-  pdpe_t *ent = &pdpe[PDPE(va)];
-  pde_t *res = NULL;
+  pdpe_t *pdpe = lookup_alloc_ent(&pml4e[PML4(va)], alloc);
+  if (!pdpe) return NULL;
 
-  if ((*ent & PTE_P)) res = KADDR(PTE_ADDR(*ent));
-  else if (create) {
-    struct PageInfo *pi = page_alloc(ALLOC_ZERO);
-    if (pi) {
-      res = page2kva(pi);
-      *ent = (uintptr_t)res | PTE_P | PTE_U | PTE_W;
-    }
-  }
+  pde_t *pde = lookup_alloc_ent(&pdpe[PDPE(va)], alloc);
+  if (!pde) return NULL;
 
-  return res;
-}
+  pte_t *pte = lookup_alloc_ent(&pde[PDX(va)], alloc);
+  if (!pte) return NULL;
 
-pte_t *
-pgdir_walk(pde_t *pgdir, const void *va, int create) {
-  // LAB 7: Fill this function in
-  pde_t *ent = &pgdir[PDX(va)];
-  pte_t *res = NULL;
-
-  if ((*ent & PTE_P)) res = KADDR(PTE_ADDR(*ent));
-  else if (create) {
-    struct PageInfo *pi = page_alloc(ALLOC_ZERO);
-    if (pi) {
-      res = page2kva(pi);
-      *ent = (uintptr_t)res | PTE_P | PTE_U | PTE_W;
-    }
-  }
-
-  return res;
+  return &pte[PTX(va)];
 }
 
 /* Map [va, va+size) of virtual address space to physical [pa, pa+size)
@@ -491,14 +444,10 @@ boot_map_region(pml4e_t *pml4e, uintptr_t va, size_t size, physaddr_t pa, int pe
   // LAB 7: Fill this function in
   uintptr_t end = va + size;
   while (va < end) {
-    pdpe_t *pdpe = pml4e_walk(pml4e, (void *)va, 1);
-    if (!pdpe) goto panicing;
-    pde_t *pde = pdpe_walk(pdpe, (void *)va, 1);
-    if (!pde) goto panicing;
-    pte_t *pte = pgdir_walk(pde, (void *)va, 1);
-    if (!pte) goto panicing;
+    pte_t *ent = pte_lookup(pml4e, (void *)va, 1);
+    if (!ent) goto panicing;
 
-    pte[PTX(va)] = pa | perm | PTE_P;
+    *ent = pa | perm | PTE_P;
 
     va += PGSIZE;
     pa += PGSIZE;
@@ -534,51 +483,20 @@ int
 page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm) {
   // LAB 7: Fill this function in
 
-  pdpe_t *pdpe = pml4e_walk(pml4e, va, 1);
-  if (!pdpe) return -E_NO_MEM;
-  pde_t *pde = pdpe_walk(pdpe, va, 1);
-  if (!pde) return -E_NO_MEM;
-  pte_t *pte = pgdir_walk(pde, va, 1);
-  if (!pte) return -E_NO_MEM;
+  pte_t *ent = pte_lookup(pml4e, va, 1);
+  if (!ent) return -E_NO_MEM;
 
   // TODO: The code that inserts page should decrement reference after
   // calling page_insert if that page is newly allocated
   pp->pp_ref++;
 
-  physaddr_t old = pte[PTX(va)];
-  if (old & PTE_P) page_remove(pml4e, va);
+  if (*ent & PTE_P) page_remove(pml4e, va);
 
-  pte[PTX(va)] = page2pa(pp) | perm | PTE_P;
+  *ent = page2pa(pp) | perm | PTE_P;
 
   return 0;
 }
 
-/* Return the page mapped at virtual address 'va'.
- * If pte_store is not zero, then we store in it the address
- * of the pte for this page.  This is used by page_remove and
- * can be used to verify page permissions for syscall arguments,
- * but should not be used by most callers.
- *
- * Return NULL if there is no page mapped at va.
- *
- * Hint: the TA solution uses pgdir_walk and pa2page. */
-struct PageInfo *
-page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store) {
-  // LAB 7: Fill this function in
-
-  pdpe_t *pdpe = pml4e_walk(pml4e, va, 0);
-  if (!pdpe) return NULL;
-  pde_t *pde = pdpe_walk(pdpe, va, 0);
-  if (!pde) return NULL;
-  pte_t *pte = pgdir_walk(pde, va, 0);
-  if (!pte) return NULL;
-
-  pte_t *ent = &pte[PTX(va)];
-
-  if (pte_store) *pte_store = ent;
-
-  return pa2page(PTE_ADDR(ent));
-}
 
 /* Unmaps the physical page at virtual address 'va'.
  * If there is no physical page at that address, silently does nothing.
@@ -597,12 +515,11 @@ void
 page_remove(pml4e_t *pml4e, void *va) {
   // LAB 7: Fill this function in
 
-  pte_t *pte;
-  struct PageInfo *pi = page_lookup(pml4e, va, &pte);
-  if (!pi) return;
+  pte_t *ent = pte_lookup(pml4e, va, 0);
+  if (!ent) return;
 
-  *pte = 0;
-  page_decref(pi);
+  *ent = 0;
+  page_decref(pa2page(PTE_ADDR(*ent)));
 
   tlb_invalidate(pml4e, va);
 }
