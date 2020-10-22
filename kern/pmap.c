@@ -445,16 +445,13 @@ boot_map_region(pml4e_t *pml4e, uintptr_t va, size_t size, physaddr_t pa, int pe
   uintptr_t end = va + size;
   while (va < end) {
     pte_t *ent = pte_lookup(pml4e, (void *)va, 1);
-    if (!ent) goto panicing;
+    if (!ent) panic("boot_map_region(): can't allocate page");
 
     *ent = pa | perm | PTE_P;
 
     va += PGSIZE;
     pa += PGSIZE;
   }
-
-panicing:
-    panic("boot_map_region(): can't allocate page");
 }
 
 /* Map the physical page 'pp' at virtual address 'va'.
@@ -568,12 +565,11 @@ mmio_map_region(physaddr_t pa, size_t size) {
   if (base + pa2 + size >= MMIOLIM)
       panic("Allocated MMIO address is too high: [0x%016lu;0x%016lu]", pa, pa + size);
 
-  size = ROUNDUP(size + (pa - pa2), PGSIZE);
-
   /* TODO: Well, I don't like the fact that mapping one address
    * twice in a row results in two different mappings... */
 
-  boot_map_region(kern_pml4e, base + pa2, size, pa2, PTE_PCD | PTE_PWT | PTE_W);
+  size = ROUNDUP(size + (pa - pa2), PGSIZE);
+  boot_map_region(kern_pml4e, base, size, pa2, PTE_PCD | PTE_PWT | PTE_W);
 
   void *new = (void *)base;
   base += size;
