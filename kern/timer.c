@@ -33,6 +33,10 @@ mmio_map_region(physaddr_t pa, size_t size) {
   map_addr_early_boot(pa, pa, size);
   return (void *)org;
 }
+static void *
+mmio_remap_last_region(physaddr_t pa, void *addr, size_t oldsz, size_t newsz) {
+  return mmio_map_region(pa, newsz);
+}
 #endif
 
 struct Timer timertab[MAX_TIMERS];
@@ -99,7 +103,7 @@ static void *acpi_find_table(const char *sign) {
 
     krsdt = mmio_map_region(rsdt_pa, sizeof(RSDT));
     /* Remap since we can obtain table length only after mapping */
-    krsdt = mmio_map_region(rsdt_pa, krsdt->h.Length);
+    krsdt = mmio_remap_last_region(rsdt_pa, krsdt, sizeof(RSDT), krsdt->h.Length);
 
     for (size_t i = 0; i < krsdt->h.Length; i++)
       cksm = (uint8_t)(cksm + ((uint8_t*)krsdt)[i]);
@@ -121,7 +125,7 @@ static void *acpi_find_table(const char *sign) {
 
     hd = mmio_map_region(fadt_pa, sizeof(ACPISDTHeader));
     /* Remap since we can obtain table length only after mapping */
-    hd = mmio_map_region(fadt_pa, hd->Length);
+    hd = mmio_remap_last_region(fadt_pa, hd, sizeof(ACPISDTHeader), krsdt->h.Length);
 
     for (size_t i = 0; i < hd->Length; i++)
       cksm = (uint8_t)(cksm + ((uint8_t*)hd)[i]);

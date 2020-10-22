@@ -397,12 +397,12 @@ page_free(struct PageInfo *pp) {
  * table and page directory entries. */
 
 static pte_t *
-lookup_alloc_ent(pte_t *ent, int create) {
+lookup_alloc_ent(pte_t *ent, bool alloc) {
   // LAB 7: Fill this function in
   pdpe_t *res = NULL;
 
   if ((*ent & PTE_P)) res = KADDR(PTE_ADDR(*ent));
-  else if (create) {
+  else if (alloc) {
     struct PageInfo *pi = page_alloc(ALLOC_ZERO);
     if (pi) {
       res = page2kva(pi);
@@ -530,16 +530,19 @@ tlb_invalidate(pml4e_t *pml4e, void *va) {
   invlpg(va);
 }
 
+
+/* Where to start the next region.  Initially, this is the
+ * beginning of the MMIO region.  Because this is static, its
+ * value will be preserved between calls to mmio_map_region
+ * (just like nextfree in boot_alloc). */
+static uintptr_t base = MMIOBASE;
+
+
 /* Reserve size bytes in the MMIO region and map [pa,pa+size) at this
  * location.  Return the base of the reserved region.  size does *not*
  * have to be multiple of PGSIZE. */
 void *
 mmio_map_region(physaddr_t pa, size_t size) {
-  /* Where to start the next region.  Initially, this is the
-   * beginning of the MMIO region.  Because this is static, its
-   * value will be preserved between calls to mmio_map_region
-   * (just like nextfree in boot_alloc). */
-  static uintptr_t base = MMIOBASE;
 
   /* Reserve size bytes of virtual memory starting at base and
    * map physical pages [pa,pa+size) to virtual addresses
@@ -565,9 +568,6 @@ mmio_map_region(physaddr_t pa, size_t size) {
   if (base + pa2 + size >= MMIOLIM)
       panic("Allocated MMIO address is too high: [0x%016lu;0x%016lu]", pa, pa + size);
 
-  /* TODO: Well, I don't like the fact that mapping one address
-   * twice in a row results in two different mappings... */
-
   size = ROUNDUP(size + (pa - pa2), PGSIZE);
   boot_map_region(kern_pml4e, base, size, pa2, PTE_PCD | PTE_PWT | PTE_W);
 
@@ -575,6 +575,19 @@ mmio_map_region(physaddr_t pa, size_t size) {
   base += size;
 
   return new;
+}
+
+/* Remap last mapped MMIO region
+ * WARN: Unsafe, use only if sure that noone have mapped
+ *       anything after this region.
+ */
+void *
+mmio_remap_last_region(physaddr_t pa, void *addr, size_t oldsz, size_t newsz) {
+  if (base - oldsz != (uintptr_t)addr)
+      panic("Remapping non-last region");
+
+  base = (uintptr_t)addr;
+  return mmio_map_region(pa, newsz);
 }
 
 
