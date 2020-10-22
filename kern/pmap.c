@@ -37,7 +37,6 @@ physaddr_t kern_cr3;
 struct PageInfo *pages;
 /* Free list of physical pages */
 static struct PageInfo *page_free_list = NULL;
-static struct PageInfo *page_free_list_top = NULL;
 /* Pointers to start and end of UEFI memory map */
 EFI_MEMORY_DESCRIPTOR *mmap_base = NULL;
 EFI_MEMORY_DESCRIPTOR *mmap_end  = NULL;
@@ -98,39 +97,6 @@ i386_detect_memory(void) {
           (unsigned long)(npages * PGSIZE / MiB),
           (unsigned long)(npages_basemem * PGSIZE / KiB),
           (unsigned long)(npages_extmem * PGSIZE / KiB));
-}
-
-/* Check if page is allocatable according to saved UEFI MemMap */
-bool
-is_page_allocatable(size_t pgnum) {
-  EFI_MEMORY_DESCRIPTOR *mmap_curr;
-  size_t pg_start, pg_end;
-
-  /* Assume page is allocabale if no loading parameters were passed. */
-  if (!mmap_base || !mmap_end) return 1;
-
-  for (mmap_curr = mmap_base; mmap_curr < mmap_end; ) {
-    pg_start = ((uintptr_t)mmap_curr->PhysicalStart >> EFI_PAGE_SHIFT);
-    pg_end   = pg_start + mmap_curr->NumberOfPages;
-
-    if (pgnum >= pg_start && pgnum < pg_end) {
-      switch (mmap_curr->Type) {
-        case EFI_LOADER_CODE:
-        case EFI_LOADER_DATA:
-        case EFI_BOOT_SERVICES_CODE:
-        case EFI_BOOT_SERVICES_DATA:
-        case EFI_CONVENTIONAL_MEMORY:
-          return (mmap_curr->Attribute & EFI_MEMORY_WB);
-        default:
-          return 0;
-      }
-    }
-
-    mmap_curr = (EFI_MEMORY_DESCRIPTOR *)((uintptr_t)mmap_curr + mem_map_size);
-  }
-
-  /* Assume page is allocatable if it's not found in MemMap. */
-  return 1;
 }
 
 /* Fix loading params and memory map address to virtual ones */
@@ -282,6 +248,50 @@ kasan_mem_init(void) {
 }
 #endif
 
+/* Check wether we should map UEFI memeory region pages as reserved */
+static bool
+is_reserved_region(EFI_MEMORY_DESCRIPTOR *desc) {
+  switch (desc->Type) {
+  case EFI_LOADER_CODE:
+  case EFI_LOADER_DATA:
+  case EFI_BOOT_SERVICES_CODE:
+  case EFI_BOOT_SERVICES_DATA:
+  case EFI_CONVENTIONAL_MEMORY:
+    return !(desc->Attribute & EFI_MEMORY_WB);
+  default:
+    return 1;
+  }
+}
+
+#define reserve(pp) ({struct PageInfo *p = (pp); p->pp_ref = 1; p->pp_link = NULL; p; })
+
+/* Check if page is allocatable according to saved UEFI MemMap */
+void
+mark_reserved(void) {
+  size_t start_p, end_p;
+
+  /* Mark first page as reserved to preserve BIOS data */
+  reserve(&pages[0]);
+
+  /* The IO hole [IOPHYSMEM, EXTPHYSMEM) is also reserved,
+   * which is followed by kernel and early boot allocation pool */
+  start_p = IOPHYSMEM/PGSIZE;
+  end_p = PADDR(boot_alloc(0))/PGSIZE;
+  while(start_p < end_p) reserve(&pages[start_p++]);
+
+  /* Mark pages reserved by UEFI if memory map is present */
+  if (mmap_base && mmap_end) {
+    for (EFI_MEMORY_DESCRIPTOR *mmap_curr = mmap_base; mmap_curr < mmap_end; ) {
+      if (is_reserved_region(mmap_curr)) {
+        start_p = ((uintptr_t)mmap_curr->PhysicalStart >> EFI_PAGE_SHIFT);
+        end_p = start_p + mmap_curr->NumberOfPages;
+        while(start_p < end_p) reserve(&pages[start_p++]);
+      }
+      mmap_curr = (EFI_MEMORY_DESCRIPTOR *)((uintptr_t)mmap_curr + mem_map_size);
+    }
+  }
+}
+
 
 /* Tracking of physical pages.
  * The 'pages' array has one 'struct PageInfo' entry per physical page.
@@ -310,49 +320,20 @@ page_init(void) {
    * Change the code to reflect this.
    * NB: DO NOT actually touch the physical memory corresponding to
    * free pages! */
-  size_t i;
-  uintptr_t first_free_page;
-  struct PageInfo *last = NULL;
 
-  /* Mark physical page 0 as in use. */
-  pages[0].pp_ref  = 1;
-  pages[0].pp_link = NULL;
+  /* Mark reserved pages */
+  mark_reserved();
 
-  /*  2) The rest of base memory, [PGSIZE, npages_basemem * PGSIZE) is free. */
-  pages[2].pp_ref = 0;
-  page_free_list = &pages[2];
-  last = &pages[2];
-  for (i = 2; i < npages_basemem; i++) {
-    if (is_page_allocatable(i)) {
-      pages[i].pp_ref = 0;
-      last->pp_link = &pages[i];
-      last = &pages[i];
-    } else {
-      pages[i].pp_ref = 1;
-      pages[i].pp_link = NULL;
+  /* Then assemble free list */
+  struct PageInfo *prev = NULL;
+  struct PageInfo **ind = &page_free_list;
+  for (size_t i = 0; i < npages; i++) {
+    if (!pages[i].pp_ref) {
+      *ind = &pages[i];
+      ind = &pages[i].pp_link;
     }
   }
-
-  /* 3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM), which must never be allocated. */
-  first_free_page = PADDR(boot_alloc(0)) / PGSIZE;
-  for (i = npages_basemem; i < first_free_page; i++) {
-    pages[i].pp_ref = 1;
-    pages[i].pp_link = NULL;
-  }
-
-  /* Some of it is in use, some is free. Where is the kernel
-   * in physical memory?  Which pages are already in use for
-   * page tables and other data structures? */
-  for (i = first_free_page; i < npages; i++) {
-    if (is_page_allocatable(i)) {
-      pages[i].pp_ref = 0;
-      last->pp_link = &pages[i];
-      last = &pages[i];
-    } else {
-      pages[i].pp_ref = 1;
-      pages[i].pp_link = NULL;
-    }
-  }
+  prev->pp_link = NULL;
 }
 
 /* Allocates a physical page.  If (alloc_flags & ALLOC_ZERO), fills the entire
@@ -372,10 +353,6 @@ page_alloc(int alloc_flags) {
 
   struct PageInfo *return_page = page_free_list;
   page_free_list = page_free_list->pp_link;
-  return_page->pp_link = NULL;
-
-  if (!page_free_list)
-    page_free_list_top = NULL;
 
 #ifdef SANITIZE_SHADOW_BASE
   if ((uintptr_t)page2kva(return_page) >= SANITIZE_SHADOW_BASE) {
@@ -389,38 +366,40 @@ page_alloc(int alloc_flags) {
   if (alloc_flags & ALLOC_ZERO)
     memset(page2kva(return_page), 0, PGSIZE);
 
-  return return_page;
+  return reserve(return_page);
 }
 
 int
 page_is_allocated(const struct PageInfo *pp) {
-  return !pp->pp_link && pp != page_free_list_top;
-}
-
-/* Return a page to the free list.
- * (This function should only be called when pp->pp_ref reaches 0) */
-void
-page_free(struct PageInfo *pp) {
-  // LAB 6: Fill this function in
-  // Hint: You may want to panic if pp->pp_ref is nonzero or
-  // pp->pp_link is not NULL.
-  if (pp->pp_ref || pp->pp_link)
-    panic("page_free: Page cannot be freed!\n");
-
-  pp->pp_link = page_free_list;
-  page_free_list = pp;
-  if (!page_free_list_top) {
-    page_free_list_top = pp;
-  }
+  return !pp->pp_link;
 }
 
 /* Decrement the reference count on a page,
  * freeing it if there are no more refs. */
 void
 page_decref(struct PageInfo *pp) {
-  if (!--pp->pp_ref) page_free(pp);
+  // LAB 6: Fill this function in
+  // Hint: You may want to panic if pp->pp_ref is nonzero or
+  // pp->pp_link is not NULL.
+
+  if (!pp->pp_ref || pp->pp_link)
+    panic("page_decref: Page cannot be freed!\n");
+
+  if (!--pp->pp_ref) {
+    pp->pp_link = page_free_list;
+    page_free_list = pp;
+  }
 }
 
+/* Decrement the reference count on a page,
+ * freeing it if there are no more refs.
+ * Reseticted version for oly one ref left */
+void
+page_free(struct PageInfo *pp) {
+  if (pp->pp_ref != 1)
+    panic("page_free: Page cannot be freed!\n");
+  page_decref(pp);
+}
 
 /* Given 'pgdir', a pointer to a page directory, pgdir_walk returns
  * a pointer to the page table entry (PTE) for linear address 'va'.
@@ -562,6 +541,8 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm) {
   pte_t *pte = pgdir_walk(pde, va, 1);
   if (!pte) return -E_NO_MEM;
 
+  // TODO: The code that inserts page should decrement reference after
+  // calling page_insert if that page is newly allocated
   pp->pp_ref++;
 
   physaddr_t old = pte[PTX(va)];

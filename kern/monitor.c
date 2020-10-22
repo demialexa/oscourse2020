@@ -120,13 +120,13 @@ mon_frequency(int argc, char **argv, struct Trapframe *tf) {
 // Implement memory (mon_memory) commands.
 int
 mon_memory(int argc, char **argv, struct Trapframe *tf) {
-    bool region = !pages[0].pp_ref;
+    bool region = !page_is_allocated(pages);
     size_t npg = 1, pgi = 0;
     for (size_t i = 0; i < npages; i++) {
-        if (region == !!pages[i].pp_ref || i == npages - 1) {
+        if (region == page_is_allocated(&pages[i]) || i == npages - 1) {
             if (pgi + 1 != i) cprintf("%lu..", pgi + 1);
             cprintf("%lu %s  \n", i, (const char *[]){"ALLOCATED", "FREE"}[region]);
-            region = !pages[i].pp_ref;
+            region = !page_is_allocated(&pages[i]);
             npg = 0, pgi = i;
         }
     }
