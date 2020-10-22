@@ -443,22 +443,58 @@ page_decref(struct PageInfo *pp) {
  *
  * Hint 3: look at inc/mmu.h for useful macros that mainipulate page
  * table and page directory entries. */
-pte_t *
+pdpe_t *
 pml4e_walk(pml4e_t *pml4e, const void *va, int create) {
   // LAB 7: Fill this function in
-  return NULL;
+  pte_t *ent = &pml4e[PML4(va)];
+  pdpe_t *res = NULL;
+
+  if ((*ent & PTE_P)) res = KADDR(PTE_ADDR(*ent));
+  else if (create) {
+    struct PageInfo *pi = page_alloc(ALLOC_ZERO);
+    if (pi) {
+      res = page2kva(pi);
+      *ent = (uintptr_t)res | PTE_P | PTE_U | PTE_W;
+    }
+  }
+
+  return res;
 }
 
-pte_t *
+pde_t *
 pdpe_walk(pdpe_t *pdpe, const void *va, int create) {
   // LAB 7: Fill this function in
-  return NULL;
+  pdpe_t *ent = &pdpe[PDPE(va)];
+  pde_t *res = NULL;
+
+  if ((*ent & PTE_P)) res = KADDR(PTE_ADDR(*ent));
+  else if (create) {
+    struct PageInfo *pi = page_alloc(ALLOC_ZERO);
+    if (pi) {
+      res = page2kva(pi);
+      *ent = (uintptr_t)res | PTE_P | PTE_U | PTE_W;
+    }
+  }
+
+  return res;
 }
 
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create) {
   // LAB 7: Fill this function in
-  return NULL;
+  pde_t *ent = &pgdir[PDX(va)];
+  pte_t *res = NULL;
+
+  if ((*ent & PTE_P)) res = KADDR(PTE_ADDR(*ent));
+  else if (create) {
+    struct PageInfo *pi = page_alloc(ALLOC_ZERO);
+    if (pi) {
+      res = page2kva(pi);
+      *ent = (uintptr_t)res | PTE_P | PTE_U | PTE_W;
+    }
+  }
+
+  return res;
 }
 
 /* Map [va, va+size) of virtual address space to physical [pa, pa+size)
@@ -474,6 +510,23 @@ pgdir_walk(pde_t *pgdir, const void *va, int create) {
 static void
 boot_map_region(pml4e_t *pml4e, uintptr_t va, size_t size, physaddr_t pa, int perm) {
   // LAB 7: Fill this function in
+  uintptr_t end = va + size;
+  while (va < end) {
+    pdpe_t *pdpe = pml4e_walk(pml4e, (void *)va, 1);
+    if (!pdpe) goto panicing;
+    pde_t *pde = pdpe_walk(pdpe, (void *)va, 1);
+    if (!pde) goto panicing;
+    pte_t *pte = pgdir_walk(pde, (void *)va, 1);
+    if (!pte) goto panicing;
+
+    pte[PTX(va)] = pa | perm | PTE_P;
+
+    va += PGSIZE;
+    pa += PGSIZE;
+  }
+
+panicing:
+    panic("boot_map_region(): can't allocate page");
 }
 
 /* Map the physical page 'pp' at virtual address 'va'.
@@ -501,6 +554,21 @@ boot_map_region(pml4e_t *pml4e, uintptr_t va, size_t size, physaddr_t pa, int pe
 int
 page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm) {
   // LAB 7: Fill this function in
+
+  pdpe_t *pdpe = pml4e_walk(pml4e, va, 1);
+  if (!pdpe) return -E_NO_MEM;
+  pde_t *pde = pdpe_walk(pdpe, va, 1);
+  if (!pde) return -E_NO_MEM;
+  pte_t *pte = pgdir_walk(pde, va, 1);
+  if (!pte) return -E_NO_MEM;
+
+  pp->pp_ref++;
+
+  physaddr_t old = pte[PTX(va)];
+  if (old & PTE_P) page_remove(pml4e, va);
+
+  pte[PTX(va)] = page2pa(pp) | perm | PTE_P;
+
   return 0;
 }
 
@@ -516,7 +584,19 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm) {
 struct PageInfo *
 page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store) {
   // LAB 7: Fill this function in
-  return NULL;
+
+  pdpe_t *pdpe = pml4e_walk(pml4e, va, 0);
+  if (!pdpe) return NULL;
+  pde_t *pde = pdpe_walk(pdpe, va, 0);
+  if (!pde) return NULL;
+  pte_t *pte = pgdir_walk(pde, va, 0);
+  if (!pte) return NULL;
+
+  pte_t *ent = &pte[PTX(va)];
+
+  if (pte_store) *pte_store = ent;
+
+  return pa2page(PTE_ADDR(ent));
 }
 
 /* Unmaps the physical page at virtual address 'va'.
@@ -535,6 +615,15 @@ page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store) {
 void
 page_remove(pml4e_t *pml4e, void *va) {
   // LAB 7: Fill this function in
+
+  pte_t *pte;
+  struct PageInfo *pi = page_lookup(pml4e, va, &pte);
+  if (!pi) return;
+
+  *pte = 0;
+  page_decref(pi);
+
+  tlb_invalidate(pml4e, va);
 }
 
 /* Invalidate a TLB entry, but only if the page tables being
