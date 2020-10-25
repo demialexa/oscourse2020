@@ -103,7 +103,7 @@
 #define EXTPHYSMEM 0x100000
 
 /* Amount of memory mapped by entrypgdir */
-#define BOOTMEMSIZE (256 * 1024 * 1024)
+#define BOOTMEMSIZE (1024 * 1024 * 1024)
 
 /* Kernel stack */
 #define KSTACKTOP KERNBASE

@@ -211,7 +211,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
 
   /* Allocate stack for new task (2 pages) */
   env->env_tf.tf_rsp = stack_top;
-  stack_top -= 2 * PGSIZE;
+  stack_top -= USTACKSIZE;
 
   /* For now init trapframe with IF set */
   env->env_tf.tf_rflags = FL_IF | FL_IOPL_0;

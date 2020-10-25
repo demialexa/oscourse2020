@@ -51,7 +51,7 @@
 /* Page directory and page table constants */
 #define NPDENTRIES  512 /* page directory entries per page directory */
 #define NPTENTRIES  512 /* page table entries per page table */
-#define NPMLENTRIES 4   /* 1TB limit should have just two PML entries */
+#define NPMLENTRIES 512   /* 1TB limit should have just two PML entries */
 #define NPDPENTRIES 512 /* page directory pointer entries per page directory pointer table */
 
 #define PGSIZE  4096 /* bytes mapped by a page */

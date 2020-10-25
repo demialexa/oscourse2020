@@ -133,7 +133,7 @@ boot_alloc(uint32_t n) {
   nextfree = (void *)ROUNDUP((uintptr_t)nextfree + n, PGSIZE);
 
   /* Just physical memory, don't consider memory regions taken by UEFI */
-  if (PADDR(nextfree) >= GiB)
+  if (PADDR(nextfree) >= BOOTMEMSIZE)
       panic("Early boot out of memory");
 
   return new;

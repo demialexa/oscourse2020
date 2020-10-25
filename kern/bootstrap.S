@@ -6,10 +6,10 @@
 # Normal x86-64 4-level translation looks like CR3->PML4->PDPE->PDE->PTE
 # We set the PTE_MBZ bits in PDE (pgdir) to skip the last step
 .set pml4,   pml4phys
-.set pdpt1,  pml4 + 0x1000
-.set pdpt2,  pml4 + 2*0x1000
-.set pde1,   pml4 + 3*0x1000
-.set pde2,   pml4 + 4*0x1000
+.set pdpt1,  pml4 + PGSIZE
+.set pdpt2,  pml4 + 2*PGSIZE
+.set pde1,   pml4 + 3*PGSIZE
+.set pde2,   pml4 + 4*PGSIZE
 
 # Should be less than 4096/8 * 11
 #define PML_SIZE 5632
@@ -54,14 +54,14 @@ _head64:
 
   # Setting the pgdir so that the LA=PA
   # Mapping first 1024mb of mem at KERNBASE
-  movq $-512, %rcx
+  movq $-NPDPENTRIES, %rcx
   movq $pde1, %rdi
   movq $pde2, %rsi
   movl $(PTE_P|PTE_W|PTE_MBZ), %eax
 1:
-  movq %rax, 0x1000(%rsi,%rcx,8)
-  movq %rax, 0x1000(%rdi,%rcx,8)
-  addq $0x200000, %rax
+  movq %rax, PGSIZE(%rsi,%rcx,8)
+  movq %rax, PGSIZE(%rdi,%rcx,8)
+  addq $PTSIZE, %rax
   incq %rcx
   jnz 1b
 
