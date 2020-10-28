@@ -973,6 +973,14 @@ TranslateVirtualAddresses (
   ASSERT_EFI_ERROR (Status);
   Status = gRT->ConvertPointer (EFI_OPTIONAL_PTR, (VOID **)&LoaderParams->DebugPubtypesEnd);
   ASSERT_EFI_ERROR (Status);
+  Status = gRT->ConvertPointer (EFI_OPTIONAL_PTR, (VOID **)&LoaderParams->SymbolTableStart);
+  ASSERT_EFI_ERROR (Status);
+  Status = gRT->ConvertPointer (EFI_OPTIONAL_PTR, (VOID **)&LoaderParams->SymbolTableEnd);
+  ASSERT_EFI_ERROR (Status);
+  Status = gRT->ConvertPointer (EFI_OPTIONAL_PTR, (VOID **)&LoaderParams->StringTableStart);
+  ASSERT_EFI_ERROR (Status);
+  Status = gRT->ConvertPointer (EFI_OPTIONAL_PTR, (VOID **)&LoaderParams->StringTableEnd);
+  ASSERT_EFI_ERROR (Status);
 }
 
 /**
