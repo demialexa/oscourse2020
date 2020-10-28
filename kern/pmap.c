@@ -36,10 +36,10 @@ static struct PageInfo *page_free_list = NULL;
 
 /* Detect machine's physical memory setup */
 
-
 #define KiB 1024
 #define MiB (KiB*KiB)
 #define GiB (KiB*MiB)
+#define REFC_FREE 0xFFFF
 
 static void
 i386_detect_memory(void) {
@@ -150,7 +150,6 @@ boot_alloc(uint32_t n) {
  * Above ULIM the user cannot read or write. */
 void
 mem_init(void) {
-  size_t size_to_alloc;
 
   /* Find out how much memory the machine has (npages). */
   i386_detect_memory();
@@ -203,6 +202,7 @@ mem_init(void) {
    *    - pages itself -- kernel RW, user NONE */
   // LAB 7: Your code goes here:
 
+  boot_map_region(kern_pml4e, UPAGES, UPAGES_SIZE, PADDR(pages), PTE_W);
 
   /* Use the physical memory that 'bootstack' refers to as the kernel
    * stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -215,8 +215,7 @@ mem_init(void) {
    *     Permissions: kernel RW, user NONE */
   // LAB 7: Your code goes here:
 
-
-
+  boot_map_region(kern_pml4e, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 
   /* Additionally map stack to lower 32-bit addresses. */
   boot_map_region(kern_pml4e, X86ADDR(KSTACKTOP - KSTKSIZE), KSTKSIZE, PADDR(bootstack), PTE_P | PTE_W);
@@ -229,12 +228,10 @@ mem_init(void) {
    * Permissions: kernel RW, user NONE */
   // LAB 7: Your code goes here:
 
-
-
+  boot_map_region(kern_pml4e, KERNBASE, npages*PGSIZE, 0, PTE_W);
 
   /* Additionally map kernel to lower 32-bit addresses. Assumes kernel should not exceed 50 mb. */
-  size_to_alloc = MIN(0x3200000, npages * PGSIZE);
-  boot_map_region(kern_pml4e, X86ADDR(KERNBASE), size_to_alloc, 0, PTE_P | PTE_W);
+  boot_map_region(kern_pml4e, X86ADDR(KERNBASE), MIN(0x3200000, npages * PGSIZE), 0, PTE_P | PTE_W);
 
   /* Map the UEFI runtime virtual memory to it corresponding physical
    * address.
@@ -309,7 +306,7 @@ kasan_mem_init(void) {
         struct PageInfo *pg = page_alloc(ALLOC_ZERO);
         if (!pg) panic("region_alloc: page alloc failed!\n");
 
-        int res = page_insert(kern_pml4e, pg, (void *)virt_addr, PTE_P | PTE_W);
+        int res = page_insert(kern_pml4e, pg, (void *)virt_addr, PTE_W);
         if (res < 0) panic("Cannot allocate any memory for page directory allocation");
       }
     }
@@ -332,7 +329,7 @@ is_reserved_region(EFI_MEMORY_DESCRIPTOR *desc) {
   }
 }
 
-#define reserve(pp) ({struct PageInfo *p = (pp); p->pp_ref = 1; p->pp_link = NULL; p; })
+#define reserve(pp, r) ({struct PageInfo *p = (pp); p->pp_ref = (r); p->pp_link = NULL; p; })
 
 /* Check if page is allocatable according to saved UEFI MemMap */
 void
@@ -340,13 +337,13 @@ mark_reserved(void) {
   size_t start_p, end_p;
 
   /* Mark first page as reserved to preserve BIOS data */
-  reserve(&pages[0]);
+  reserve(&pages[0], 1);
 
   /* The IO hole [IOPHYSMEM, EXTPHYSMEM) is also reserved,
    * which is followed by kernel and early boot allocation pool */
   start_p = IOPHYSMEM/PGSIZE;
   end_p = PADDR(boot_alloc(0))/PGSIZE;
-  while(start_p < end_p) reserve(&pages[start_p++]);
+  while(start_p < end_p) reserve(&pages[start_p++], 1);
 
   /* Mark pages reserved by UEFI if memory map is present */
   if (uefi_lp && uefi_lp->MemoryMap) {
@@ -356,7 +353,7 @@ mark_reserved(void) {
       if (is_reserved_region(start)) {
         start_p = ((uintptr_t)start->PhysicalStart >> EFI_PAGE_SHIFT);
         end_p = start_p + start->NumberOfPages;
-        while(start_p < end_p) reserve(&pages[start_p++]);
+        while(start_p < end_p) reserve(&pages[start_p++], 1);
       }
     }
   }
@@ -400,6 +397,7 @@ page_init(void) {
     if (!pages[i].pp_ref) {
       *ind = &pages[i];
       ind = &pages[i].pp_link;
+      pages[i].pp_ref = REFC_FREE;
     }
   }
   *ind = NULL;
@@ -435,12 +433,12 @@ page_alloc(int alloc_flags) {
   if (alloc_flags & ALLOC_ZERO)
     memset(page2kva(return_page), 0, PGSIZE);
 
-  return reserve(return_page);
+  return reserve(return_page, 0);
 }
 
 int
 page_is_allocated(const struct PageInfo *pp) {
-  return !pp->pp_link;
+  return pp->pp_ref != REFC_FREE;
 }
 
 /* Decrement the reference count on a page,
@@ -449,10 +447,10 @@ void
 page_decref(struct PageInfo *pp) {
   // LAB 6: Fill this function in
 
-  if (!pp->pp_ref || pp->pp_link)
+  if (pp->pp_ref == REFC_FREE || pp->pp_link)
     panic("page_decref: Page cannot be freed!\n");
 
-  if (!--pp->pp_ref) {
+  if (--pp->pp_ref == REFC_FREE) {
     pp->pp_link = page_free_list;
     page_free_list = pp;
   }
@@ -463,7 +461,7 @@ page_decref(struct PageInfo *pp) {
  * Reseticted version for oly one ref left */
 void
 page_free(struct PageInfo *pp) {
-  if (pp->pp_ref != 1)
+  if (pp->pp_ref)
     panic("page_free: Page cannot be freed!\n");
   page_decref(pp);
 }
@@ -499,8 +497,8 @@ lookup_alloc_ent(pte_t *ent, bool alloc) {
   else if (alloc) {
     struct PageInfo *pi = page_alloc(ALLOC_ZERO);
     if (pi) {
+      *ent = (uintptr_t)page2pa(pi) | PTE_P | PTE_U | PTE_W;
       res = page2kva(pi);
-      *ent = (uintptr_t)res | PTE_P | PTE_U | PTE_W;
     }
   }
 
@@ -509,7 +507,7 @@ lookup_alloc_ent(pte_t *ent, bool alloc) {
 
 /* Find page table item */
 static pte_t *
-pte_lookup(pml4e_t *pml4e, void *va, bool alloc) {
+pml4e_walk(pml4e_t *pml4e, void *va, bool alloc) {
   // LAB 7: Fill this function in
   pdpe_t *pdpe = lookup_alloc_ent(&pml4e[PML4(va)], alloc);
   if (!pdpe) return NULL;
@@ -523,31 +521,12 @@ pte_lookup(pml4e_t *pml4e, void *va, bool alloc) {
   return &pte[PTX(va)];
 }
 
-
-/* This functions is only required in testing code...
- * TODO Remove this */
-inline static pte_t *
-pml4e_walk(pml4e_t *pml4e, const void *va, int create) {
-  pte_t *ent = &pml4e[PML4(va)];
-
-  if (*ent & PTE_P) return ent;
-  else if (create) {
-    struct PageInfo *pi = page_alloc(ALLOC_ZERO);
-    if (pi) {
-      *ent = (uintptr_t)page2kva(pi) | PTE_P | PTE_U | PTE_W;
-      return ent;
-    }
-  }
-
-  return NULL;
-}
-
 /* This functions is only required in testing code...
  * TODO Remove this */
 struct PageInfo *page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store) {
-  pte_t *ent = pte_lookup(pml4e, va, 0);
+  pte_t *ent = pml4e_walk(pml4e, va, 0);
   if (pte_store) *pte_store = ent;
-  return pa2page(PTE_ADDR(*ent));
+  return ent ? pa2page(PTE_ADDR(*ent)) : NULL;
 }
 
 /* Map [va, va+size) of virtual address space to physical [pa, pa+size)
@@ -565,7 +544,7 @@ boot_map_region(pml4e_t *pml4e, uintptr_t va, size_t size, physaddr_t pa, int pe
   // LAB 7: Fill this function in
   uintptr_t end = va + size;
   while (va < end) {
-    pte_t *ent = pte_lookup(pml4e, (void *)va, 1);
+    pte_t *ent = pml4e_walk(pml4e, (void *)va, 1);
     if (!ent) panic("boot_map_region(): can't allocate page");
 
     *ent = pa | perm | PTE_P;
@@ -601,7 +580,7 @@ int
 page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm) {
   // LAB 7: Fill this function in
 
-  pte_t *ent = pte_lookup(pml4e, va, 1);
+  pte_t *ent = pml4e_walk(pml4e, va, 1);
   if (!ent) return -E_NO_MEM;
 
   // TODO: The code that inserts page should decrement reference after
@@ -633,11 +612,11 @@ void
 page_remove(pml4e_t *pml4e, void *va) {
   // LAB 7: Fill this function in
 
-  pte_t *ent = pte_lookup(pml4e, va, 0);
+  pte_t *ent = pml4e_walk(pml4e, va, 0);
   if (!ent) return;
 
-  *ent = 0;
   page_decref(pa2page(PTE_ADDR(*ent)));
+  *ent = 0;
 
   tlb_invalidate(pml4e, va);
 }
@@ -957,6 +936,7 @@ check_page(void) {
   assert(pp4 = page_alloc(0));
   assert(pp5 = page_alloc(0));
 
+
   assert(pp0);
   assert(pp1 && pp1 != pp0);
   assert(pp2 && pp2 != pp1 && pp2 != pp0);
@@ -978,6 +958,7 @@ check_page(void) {
   /* there is no free memory, so we can't allocate a page table */
   assert(page_insert(kern_pml4e, pp1, 0x0, 0) < 0);
 
+
   /* free pp0 and try again: pp0 should be used for page table */
   page_free(pp0);
   assert(page_insert(kern_pml4e, pp1, 0x0, 0) < 0);
@@ -993,7 +974,7 @@ check_page(void) {
   /*should be able to map pp3 at PGSIZE because pp0 is already allocated for page table */
   assert(page_insert(kern_pml4e, pp3, (void *)PGSIZE, 0) == 0);
   assert(check_va2pa(kern_pml4e, PGSIZE) == page2pa(pp3));
-  assert(pp3->pp_ref == 2);
+  assert(pp3->pp_ref == 1); // <-- Here was 2
 
   /* should be no free memory */
   assert(!page_alloc(0));
@@ -1001,7 +982,7 @@ check_page(void) {
   /* should be able to map pp3 at PGSIZE because it's already there */
   assert(page_insert(kern_pml4e, pp3, (void *)PGSIZE, 0) == 0);
   assert(check_va2pa(kern_pml4e, PGSIZE) == page2pa(pp3));
-  assert(pp3->pp_ref == 2);
+  assert(pp3->pp_ref == 1); // <-- Here was 2
 
   /* pp3 should NOT be on the free list
    * could happen in ref counts are handled sloppily in page_insert */
@@ -1015,7 +996,7 @@ check_page(void) {
   /* should be able to change permissions too. */
   assert(page_insert(kern_pml4e, pp3, (void *)PGSIZE, PTE_U) == 0);
   assert(check_va2pa(kern_pml4e, PGSIZE) == page2pa(pp3));
-  assert(pp3->pp_ref == 2);
+  assert(pp3->pp_ref == 1); // <-- Here was 2
   assert(*pml4e_walk(kern_pml4e, (void *)PGSIZE, 0) & PTE_U);
   assert(kern_pml4e[0] & PTE_U);
 
@@ -1031,14 +1012,14 @@ check_page(void) {
   assert(check_va2pa(kern_pml4e, PGSIZE) == page2pa(pp1));
   /* ... and ref counts should reflect this */
   assert(pp1->pp_ref == 2);
-  assert(pp3->pp_ref == 1);
+  assert(pp3->pp_ref == 0); // <-- Here was 1
 
   /* unmapping pp1 at 0 should keep pp1 at PGSIZE */
   page_remove(kern_pml4e, 0x0);
   assert(check_va2pa(kern_pml4e, 0x0) == ~0);
   assert(check_va2pa(kern_pml4e, PGSIZE) == page2pa(pp1));
   assert(pp1->pp_ref == 1);
-  assert(pp3->pp_ref == 1);
+  assert(pp3->pp_ref == 0); // <-- Here was 1
 
   /* Test re-inserting pp1 at PGSIZE. */
   /* Thanks to Varun Agrawal for suggesting this test case. */
@@ -1051,7 +1032,7 @@ check_page(void) {
   assert(check_va2pa(kern_pml4e, 0x0) == ~0);
   assert(check_va2pa(kern_pml4e, PGSIZE) == ~0);
   assert(pp1->pp_ref == 0);
-  assert(pp3->pp_ref == 1);
+  assert(pp3->pp_ref == 0); // <-- Here was 1
 
 #if 0
     /* should be able to page_insert to change a page
@@ -1072,7 +1053,7 @@ check_page(void) {
   /* forcibly take pp3 back */
   assert((PTE_ADDR(kern_pml4e[0]) == page2pa(pp0) || PTE_ADDR(kern_pml4e[0]) == page2pa(pp2) || PTE_ADDR(kern_pml4e[0]) == page2pa(pp3)));
   kern_pml4e[0] = 0;
-  assert(pp3->pp_ref == 1);
+  assert(pp3->pp_ref == 0); // <-- Here was 1
   page_decref(pp3);
   /* check pointer arithmetic in pml4e_walk */
   page_decref(pp0);
@@ -1142,7 +1123,7 @@ check_page_installed_pml4(void) {
   /* forcibly take pp0 back */
   assert(PTE_ADDR(kern_pml4e[0]) == page2pa(pp0));
   kern_pml4e[0] = 0;
-  assert(pp0->pp_ref == 1);
+  assert(pp0->pp_ref == 0); // <-- Here was 1
   pp0->pp_ref = 0;
 
   /* free the pages we took */
