@@ -16,6 +16,7 @@
 #include <kern/sched.h>
 #include <kern/picirq.h>
 #include <kern/kclock.h>
+#include <kern/kdebug.h>
 
 void
 timers_init(void) {
@@ -97,7 +98,9 @@ early_boot_pml4_init(void) {
   map_addr_early_boot(SANITIZE_SHADOW_BASE, SANITIZE_SHADOW_BASE - KERNBASE, SANITIZE_SHADOW_SIZE);
 #endif
 
+#if LAB <= 6
   map_addr_early_boot(FBUFFBASE, uefi_lp->FrameBufferBase, uefi_lp->FrameBufferSize);
+#endif
 }
 
 void
@@ -131,6 +134,11 @@ i386_init(void) {
 #ifdef CONFIG_KSPACE
   pic_init();
   clock_idt_init();
+
+#ifdef SANITIZE_SHADOW_BASE
+  kasan_mem_init();
+#endif
+
   timers_init();
 #endif
 
