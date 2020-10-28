@@ -667,7 +667,7 @@ mmio_map_region(physaddr_t pa, size_t size) {
 
   uintptr_t pa2 = ROUNDDOWN(pa, PGSIZE);
 
-  if (base + pa2 + size >= MMIOLIM)
+  if (base + size >= MMIOLIM)
       panic("Allocated MMIO address is too high: [0x%016lu;0x%016lu]", pa, pa + size);
 
   size = ROUNDUP(size + (pa - pa2), PGSIZE);
@@ -685,6 +685,7 @@ mmio_map_region(physaddr_t pa, size_t size) {
  */
 void *
 mmio_remap_last_region(physaddr_t pa, void *addr, size_t oldsz, size_t newsz) {
+  oldsz = ROUNDUP((uintptr_t)addr + oldsz, PGSIZE) - (uintptr_t)addr;
   if (base - oldsz != (uintptr_t)addr)
       panic("Remapping non-last region");
 
