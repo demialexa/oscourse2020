@@ -39,7 +39,7 @@ static struct PageInfo *page_free_list = NULL;
 #define KiB 1024
 #define MiB (KiB*KiB)
 #define GiB (KiB*MiB)
-#define REFC_FREE 0xFFFF
+#define REFC_FREE 0xFFFFFFFF
 
 static void
 i386_detect_memory(void) {
@@ -162,6 +162,7 @@ mem_init(void) {
   memset(pml4e, 0, PGSIZE);
   kern_pml4e = pml4e;
   kern_cr3 = PADDR(pml4e);
+
 
 
   /* Recursively insert PD in itself as a page table, to form
@@ -291,7 +292,7 @@ kasan_mem_init(void) {
 
   /* Go through all pages and unpoison pages which have at least one ref. */
   for (int pgidx = 0; pgidx < npages; pgidx++)
-    if (pages[pgidx].pp_ref > 0)
+    if (pages[pgidx].pp_ref >= 0)
       platform_asan_unpoison(page2kva(&pages[pgidx]), PGSIZE);
 
   /* Additinally map all UEFI runtime services corresponding shadow memory. */
@@ -335,6 +336,7 @@ is_reserved_region(EFI_MEMORY_DESCRIPTOR *desc) {
 void
 mark_reserved(void) {
   size_t start_p, end_p;
+
 
   /* Mark first page as reserved to preserve BIOS data */
   reserve(&pages[0], 1);

@@ -1,5 +1,7 @@
 # This is required for basic initialisation for KASAN itself
 fun:mem_init
+fun:mark_reserved
+fun:is_reserved_region
 fun:i386_detect_memory
 fun:load_params_read
 fun:fix_lp_addresses

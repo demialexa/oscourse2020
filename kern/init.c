@@ -118,10 +118,8 @@ i386_init(void) {
   cprintf("6828 decimal is %o octal!\n", 6828);
   cprintf("END: %p\n", end);
 
-#ifndef CONFIG_KSPACE
-  // Lab 6 memory management initialization functions
+  /* Lab 6 memory management initialization functions */
   mem_init();
-#endif
 
   /* Perform global constructor initialisation (e.g. asan)
    * This must be done as early as possible */
