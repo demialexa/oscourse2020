@@ -1,7 +1,5 @@
 /* See COPYRIGHT for copyright information. */
 
-#ifdef CONFIG_KSPACE
-
 #include <inc/mmu.h>
 #include <inc/memlayout.h>
 #include <inc/trap.h>
@@ -28,5 +26,3 @@ timer_thdlr:
   movl $(IRQ_OFFSET + IRQ_TIMER), 136(%rsp)
   call trap
   jmp .
-
-#endif

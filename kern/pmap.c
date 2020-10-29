@@ -296,7 +296,7 @@ kasan_mem_init(void) {
       platform_asan_unpoison(page2kva(&pages[pgidx]), PGSIZE);
 
   /* Additinally map all UEFI runtime services corresponding shadow memory. */
-  EFI_MEMORY_DESCRIPTOR *start = (void *)uefi_lp->MemoryMap;
+  EFI_MEMORY_DESCRIPTOR *start = (void *)uefi_lp->MemoryMapVirt;
   EFI_MEMORY_DESCRIPTOR *end = (void *)((uint8_t *)start + uefi_lp->MemoryMapSize);
   for (; start < end; start = (void *)((uint8_t *)start + uefi_lp->MemoryMapDescriptorSize)) {
     uintptr_t virt_addr = ROUNDDOWN((uintptr_t)((start->VirtualStart >> 3) + SANITIZE_SHADOW_OFF), PGSIZE);

@@ -93,6 +93,7 @@ find_function(const char *const fname) {
 
   /* Load kernel symbol and string tables */
 
+
   struct Elf64_Sym *ksyms = (struct Elf64_Sym *)uefi_lp->SymbolTableStart;
   struct Elf64_Sym *ksymsend = (struct Elf64_Sym *)uefi_lp->SymbolTableEnd;
   const char *kstrs = (char *)uefi_lp->StringTableStart;

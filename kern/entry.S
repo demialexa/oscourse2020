@@ -22,7 +22,6 @@ entry:
   jmp .
 
 
-#ifdef CONFIG_KSPACE
 .global save_trapframe_trap
 save_trapframe_trap:
   popq save_trapframe_ret(%rip)
@@ -97,7 +96,6 @@ sys_exit:
   call csys_exit
   jmp .
 
-#endif
 
 .data
 

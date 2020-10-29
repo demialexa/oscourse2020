@@ -26,10 +26,9 @@ sched_yield(void) {
 
   // LAB 3: Your code here:
 
-#ifdef CONFIG_KSPACE
   /* If no current environment,
    * start scanning from the beginning of array */
-  int id   = curenv ? ENVX(curenv_getid()) : -1;
+  int id   = curenv ? ENVX(curenv_getid()) : NENV - 1;
   int orig = id;
 
   do {
@@ -40,7 +39,6 @@ sched_yield(void) {
       env_run(envs + id);
     }
   } while (id != orig);
-#endif
 
   cprintf("Halt\n");
 

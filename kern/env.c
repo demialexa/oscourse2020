@@ -12,6 +12,7 @@
 #include <kern/monitor.h>
 #include <kern/sched.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
 
 static struct Env env_array[NENV];
 /* Free environment list
@@ -25,8 +26,6 @@ struct Env *envs = env_array;
 
 /* NOTE: Should be at least LOGNENV */
 #define ENVGENSHIFT 12
-
-extern unsigned int bootstacktop;
 
 /* Global descriptor table.
  *
@@ -159,6 +158,23 @@ env_init(void) {
 
 #ifdef CONFIG_KSPACE
 
+int map_prog_segment(pml4e_t *pml4e, uintptr_t start, uintptr_t bss_start, uintptr_t end) {
+  start = ROUNDDOWN(start, PGSIZE);
+  bss_start = ROUNDDOWN(bss_start, PGSIZE);
+  end = ROUNDUP(end, PGSIZE);
+
+  while (start < end) {
+    struct PageInfo *pi = page_alloc(start >= bss_start ? ALLOC_ZERO : 0);
+    if (!pi) return -E_NO_MEM;
+    int res = page_insert(pml4e, pi, (void *)start, PTE_U | PTE_W);
+    page_decref(pi);
+    if (res < 0) return res;
+    start += PGSIZE;
+  }
+
+  return 0;
+}
+
 /* Allocates and initializes a new environment.
  * On success, the new environment is stored in *newenv_store.
  *
@@ -212,6 +228,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
   /* Allocate stack for new task (2 pages) */
   env->env_tf.tf_rsp = stack_top;
   stack_top -= USTACKSIZE;
+  map_prog_segment(kern_pml4e, stack_top, stack_top, stack_top + USTACKSIZE);
+
 
   /* For now init trapframe with IF set */
   env->env_tf.tf_rflags = FL_IF | FL_IOPL_0;
@@ -470,8 +488,10 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
 
       cprintf("Loading section of size 0x%08lX to %p...\n", (unsigned long)filesz, dst);
 
+      uintptr_t stt = (uintptr_t)dst;
+      map_prog_segment(kern_pml4e, stt, stt + filesz, stt + memsz);
+
       memcpy(dst, src, filesz);
-      memset(dst + filesz, 0, memsz - filesz);
     }
   }
 
@@ -518,6 +538,8 @@ env_create(uint8_t *binary, size_t size, enum EnvType type) {
   if (load_icode(newenv, binary, size) < 0)
     panic("Can't load ELF image");
 }
+
+#endif
 
 /* Frees env and all memory it uses */
 void
@@ -669,5 +691,3 @@ env_run(struct Env *env) {
 
   env_pop_tf(&curenv->env_tf);
 }
-
-#endif
