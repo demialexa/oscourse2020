@@ -35,6 +35,7 @@ static struct Command commands[] = {
     {"timer_stop", "Stop timer", mon_stop},
     {"timer_freq", "Get timer frequency", mon_frequency},
     {"memory", "Display allocated memory pages", mon_memory},
+    {"pagedump", "Display kernel page table", mon_pagedump},
 };
 #define NCOMMANDS (sizeof(commands) / sizeof(commands[0]))
 
@@ -132,6 +133,38 @@ mon_memory(int argc, char **argv, struct Trapframe *tf) {
     }
     return 0;
 }
+
+int
+mon_pagedump(int argc, char **argv, struct Trapframe *tf) {
+  pml4e_t *pml4 = kern_pml4e;
+  cprintf("CR3 %016lX\n", kern_cr3);
+  cprintf("PML4 %p\n", kern_pml4e);
+  for (size_t i = 0; i < NPMLENTRIES; i++) {
+    if (pml4[i] & PTE_P) {
+      cprintf("|-[%03lu] = %016lX\n", i, pml4[i]);
+      pdpe_t *pdpe = KADDR(PTE_ADDR(pml4[i]));
+      for (size_t i = 0; i < NPDPENTRIES; i++) {
+        if (pdpe[i] & PTE_P) {
+          cprintf("   |-[%03lu] = %016lX\n", i, pdpe[i]);
+          pde_t *pde = KADDR(PTE_ADDR(pdpe[i]));
+          for (size_t i = 0; i < NPDENTRIES; i++) {
+            if (pde[i] & PTE_P) {
+              cprintf("      |-[%03lu] = %016lX\n", i, pde[i]);
+              pte_t *pte = KADDR(PTE_ADDR(pde[i]));
+              for (size_t i = 0; i < NPDPENTRIES; i++) {
+                if (pte[i] & PTE_P) {
+                    cprintf("         |-[%03lu] = %016lX\n", i, pte[i]);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0;
+}
+
 
 
 /* Kernel monitor command interpreter */
