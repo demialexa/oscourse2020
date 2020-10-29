@@ -150,12 +150,14 @@ mon_pagedump(int argc, char **argv, struct Trapframe *tf) {
           for (size_t i = 0; i < NPDENTRIES; i++) {
             if (pde[i] & PTE_P) {
               cprintf("      |-[%03lu] = %016lX\n", i, pde[i]);
+#if 0 // Slow
               pte_t *pte = KADDR(PTE_ADDR(pde[i]));
               for (size_t i = 0; i < NPDPENTRIES; i++) {
                 if (pte[i] & PTE_P) {
                     cprintf("         |-[%03lu] = %016lX\n", i, pte[i]);
                 }
               }
+#endif
             }
           }
         }
