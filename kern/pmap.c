@@ -180,8 +180,9 @@ mem_init(void) {
    * to initialize all fields of each struct PageInfo to 0. */
   // LAB 6: Your code here:
 
-  pages = boot_alloc(npages*sizeof(*pages));
-  memset(pages, 0, npages*sizeof(*pages));
+  size_t pages_size = ROUNDUP(npages*sizeof(*pages), PGSIZE);
+  pages = boot_alloc(pages_size);
+  memset(pages, 0, pages_size);
 
   /* Now that we've allocated the initial kernel data structures, we set
    * up the list of free physical pages. Once we've done so, all further
@@ -203,7 +204,7 @@ mem_init(void) {
    *    - pages itself -- kernel RW, user NONE */
   // LAB 7: Your code goes here:
 
-  boot_map_region(kern_pml4e, UPAGES, UPAGES_SIZE, PADDR(pages), PTE_W);
+  boot_map_region(kern_pml4e, UPAGES, pages_size, PADDR(pages), PTE_W);
 
   /* Use the physical memory that 'bootstack' refers to as the kernel
    * stack.  The kernel stack grows down from virtual address KSTACKTOP.
