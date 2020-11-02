@@ -11,6 +11,10 @@ entry:
   # Save LoadParams in uefi_lp.
   movq %rcx, uefi_lp(%rip)
 
+  # LAB 4 taks 2
+  cli
+  # LAB 4 done
+
   # Set the stack pointer.
   leaq bootstacktop(%rip),%rsp
 
@@ -80,9 +84,17 @@ sys_yield:
 .globl sys_exit
 .type  sys_exit, @function
 sys_exit:
+
+  # LAB 4 task 2
+  cli
+  # LAB 4 done
+
+  # LAB 3
   leaq bootstacktop(%rip),%rsp
   xor %ebp, %ebp
   call csys_exit
+  # LAB 3 done
+
   jmp .
 #endif
 
