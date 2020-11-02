@@ -91,8 +91,8 @@ find_function(const char *const fname) {
     const char *name;
     uintptr_t addr;
   } sentry[] = {
-      { "sys_yield", 0x8041600087/*(uintptr_t)sys_yield*/ },
-      { "sys_exit", 0x8041600093/*(uintptr_t)sys_exit*/ },
+      { "sys_yield", (uintptr_t)sys_yield },
+      { "sys_exit", (uintptr_t)sys_exit },
   };
 
   for (size_t i = 0; i < sizeof(sentry)/sizeof(sentry[0]); i++) {
