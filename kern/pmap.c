@@ -677,7 +677,7 @@ mmio_map_region(physaddr_t pa, size_t size) {
   void *new = (void *)base;
   base += size;
 
-  return new;
+  return new + (pa - pa2);
 }
 
 /* Remap last mapped MMIO region
@@ -686,11 +686,12 @@ mmio_map_region(physaddr_t pa, size_t size) {
  */
 void *
 mmio_remap_last_region(physaddr_t pa, void *addr, size_t oldsz, size_t newsz) {
-  oldsz = ROUNDUP((uintptr_t)addr + oldsz, PGSIZE) - (uintptr_t)addr;
-  if (base - oldsz != (uintptr_t)addr)
+  uintptr_t addr2 = ROUNDDOWN((uintptr_t)addr, PGSIZE);
+  oldsz = ROUNDUP((uintptr_t)addr + oldsz, PGSIZE) - (uintptr_t)addr2;
+  if (base - oldsz != (uintptr_t)addr2)
       panic("Remapping non-last region");
 
-  base = (uintptr_t)addr;
+  base = (uintptr_t)addr2;
   return mmio_map_region(pa, newsz);
 }
 
