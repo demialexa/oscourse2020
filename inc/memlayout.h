@@ -211,10 +211,16 @@ struct PageInfo {
   /* Next page on the free list */
   struct PageInfo *pp_link;
 
-  /* pp_ref is the count of pointers (usually in page table entries)
+  /* pp_ref is the count of pointers minus one (usually in page table entries)
    * to this page, for pages allocated using page_alloc.
+   *
    * Pages allocated at boot time using pmap.c's
    * boot_alloc do not have valid reference count fields
+   *
+   * page_alloc sets pp_ref to 0 (i.e. 1 pointer)
+   * so code that allocates a page and then inserts
+   * it to the page table should call page_decref
+   * after useage (or page_free if there is exactly once pointer left)
    */
 
   uint32_t pp_ref;
