@@ -204,7 +204,7 @@ mem_init(void) {
    *    - pages itself -- kernel RW, user NONE */
   // LAB 7: Your code goes here:
 
-  boot_map_region(kern_pml4e, UPAGES, pages_size, PADDR(pages), PTE_W);
+  boot_map_region(kern_pml4e, UPAGES, pages_size, PADDR(pages), PTE_U);
 
   /* Use the physical memory that 'bootstack' refers to as the kernel
    * stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -494,7 +494,7 @@ page_free(struct PageInfo *pp) {
 static pte_t *
 lookup_alloc_ent(pte_t *ent, bool alloc) {
   // LAB 7: Fill this function in
-  pdpe_t *res = NULL;
+  pte_t *res = NULL;
 
   if (*ent & PTE_P) res = KADDR(PTE_ADDR(*ent));
   else if (alloc) {
