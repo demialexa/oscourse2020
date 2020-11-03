@@ -257,7 +257,7 @@ include lib/Makefrag
 include prog/Makefrag
 
 QEMUOPTS = -hda fat:rw:$(JOS_ESP) -serial mon:stdio -gdb tcp::$(GDBPORT)
-QEMUOPTS += -m 8192M
+QEMUOPTS += -m 8192M -d int,cpu_reset,mmu,pcall -no-reboot
 
 QEMUOPTS += $(shell if $(QEMU) -display none -help | grep -q '^-D '; then echo '-D qemu.log'; fi)
 IMAGES = $(OVMF_FIRMWARE) $(JOS_LOADER) $(OBJDIR)/kern/kernel $(JOS_ESP)/EFI/BOOT/kernel $(JOS_ESP)/EFI/BOOT/$(JOS_BOOTER)
