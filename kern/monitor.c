@@ -15,6 +15,7 @@
 #include <kern/timer.h>
 #include <kern/env.h>
 #include <kern/pmap.h>
+#include <kern/trap.h>
 
 #define WHITESPACE "\t\r\n "
 #define MAXARGS    16
@@ -211,6 +212,8 @@ monitor(struct Trapframe *tf) {
   cprintf("Welcome to the JOS kernel monitor!\n");
   cprintf("Type 'help' for a list of commands.\n");
 
+  if (tf) print_trapframe(tf);
+  
   char *buf;
   do buf = readline("K> ");
   while (!buf || runcmd(buf, tf) >= 0);

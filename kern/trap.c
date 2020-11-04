@@ -3,16 +3,19 @@
 #include <inc/assert.h>
 #include <inc/string.h>
 
+#include <kern/pmap.h>
 #include <kern/trap.h>
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/env.h>
+#include <kern/syscall.h>
 #include <kern/sched.h>
 #include <kern/kclock.h>
 #include <kern/picirq.h>
 #include <kern/timer.h>
 
 extern uintptr_t gdtdesc_64;
+static struct Taskstate ts;
 extern struct Segdesc gdt[];
 extern long gdt_pd;
 
@@ -58,6 +61,74 @@ trapname(int trapno) {
 }
 
 void
+trap_init(void) {
+  //extern struct Segdesc gdt[];
+  // LAB 8: Your code here:
+
+  extern void trap_divide(void);
+  extern void trap_debig(void);
+  extern void trap_nmi(void);
+  extern void trap_brkpt(void);
+  extern void trap_oflow(void);
+  extern void trap_bound(void);
+  extern void trap_illop(void);
+  extern void trap_device(void);
+  extern void trap_dblflt(void);
+  extern void trap_tss(void);
+  extern void trap_segnp(void);
+  extern void trap_stack(void);
+  extern void trap_gpflt(void);
+  extern void trap_pgflt(void);
+  extern void trap_fperr(void);
+  extern void trap_align(void);
+  extern void trap_mchk(void);
+  extern void trap_simderr(void);
+  extern void trap_syscall(void);
+
+  SETGATE(idt[T_DIVIDE], 0, GD_KT, (uintptr_t)(&trap_divide), 0)
+  SETGATE(idt[T_DEBUG], 0, GD_KT, (uintptr_t)(&trap_debig), 0)
+  SETGATE(idt[T_NMI], 0, GD_KT, (uintptr_t)(&trap_nmi), 0)
+  SETGATE(idt[T_BRKPT], 0, GD_KT, (uintptr_t)(&trap_brkpt), 3)
+  SETGATE(idt[T_OFLOW], 0, GD_KT, (uintptr_t)(&trap_oflow), 0)
+  SETGATE(idt[T_BOUND], 0, GD_KT, (uintptr_t)(&trap_bound), 0)
+  SETGATE(idt[T_ILLOP], 0, GD_KT, (uintptr_t)(&trap_illop), 0)
+  SETGATE(idt[T_DEVICE], 0, GD_KT, (uintptr_t)(&trap_device), 0)
+  SETGATE(idt[T_DBLFLT], 0, GD_KT, (uintptr_t)(&trap_dblflt), 0)
+  SETGATE(idt[T_TSS], 0, GD_KT, (uintptr_t)(&trap_tss), 0)
+  SETGATE(idt[T_SEGNP], 0, GD_KT, (uintptr_t)(&trap_segnp), 0)
+  SETGATE(idt[T_STACK], 0, GD_KT, (uintptr_t)(&trap_stack), 0)
+  SETGATE(idt[T_GPFLT], 0, GD_KT, (uintptr_t)(&trap_gpflt), 0)
+  SETGATE(idt[T_PGFLT], 0, GD_KT, (uintptr_t)(&trap_pgflt), 0)
+  SETGATE(idt[T_FPERR], 0, GD_KT, (uintptr_t)(&trap_fperr), 0)
+  SETGATE(idt[T_ALIGN], 0, GD_KT, (uintptr_t)(&trap_align), 0)
+  SETGATE(idt[T_MCHK], 0, GD_KT, (uintptr_t)(&trap_mchk), 0)
+  SETGATE(idt[T_SIMDERR], 0, GD_KT, (uintptr_t)(&trap_simderr), 0)
+  SETGATE(idt[T_SYSCALL], 0, GD_KT, (uintptr_t)(&trap_syscall), 3)
+
+  /* Per-CPU setup */
+  trap_init_percpu();
+}
+
+/* Initialize and load the per-CPU TSS and IDT */
+void
+trap_init_percpu(void) {
+  /* Setup a TSS so that we get the right stack
+   * when we trap to the kernel. */
+  ts.ts_esp0 = KSTACKTOP;
+
+  /* Initialize the TSS slot of the gdt. */
+  SETTSS((struct SystemSegdesc64 *)(&gdt[(GD_TSS0 >> 3)]), STS_T64A,
+         (uint64_t)(&ts), sizeof(struct Taskstate), 0);
+
+  /* Load the TSS selector (like other segment selectors, the
+   * bottom three bits are special; we leave them 0) */
+  ltr(GD_TSS0);
+
+  /* Load the IDT */
+  lidt(&idt_pd);
+}
+
+void
 clock_idt_init(void) {
   extern void clock_thdlr(void);
   extern void timer_thdlr(void);
@@ -98,11 +169,8 @@ print_trapframe(struct Trapframe *tf) {
   cprintf("  rip  0x%08lx\n", (unsigned long)tf->tf_rip);
   cprintf("  cs   0x----%04x\n", tf->tf_cs);
   cprintf("  flag 0x%08lx\n", (unsigned long)tf->tf_rflags);
-
-  if (tf->tf_cs & 3) {
-    cprintf("  rsp  0x%08lx\n", (unsigned long)tf->tf_rsp);
-    cprintf("  ss   0x----%04x\n", tf->tf_ss);
-  }
+  cprintf("  rsp  0x%08lx\n", (unsigned long)tf->tf_rsp);
+  cprintf("  ss   0x----%04x\n", tf->tf_ss);
 }
 
 void
@@ -126,27 +194,40 @@ print_regs(struct PushRegs *regs) {
 
 static void
 trap_dispatch(struct Trapframe *tf) {
-  /* Handle processor exceptions */
-
-  /* Handle spurious interrupts
-   * The hardware sometimes raises these because of noise on the
-   * IRQ line or other reasons, we don't care */
-  if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
+  switch (tf->tf_trapno) {
+  case T_SYSCALL:
+    tf->tf_regs.reg_rax = syscall(
+        tf->tf_regs.reg_rax,
+        tf->tf_regs.reg_rdx,
+        tf->tf_regs.reg_rcx,
+        tf->tf_regs.reg_rbx,
+        tf->tf_regs.reg_rdi,
+        tf->tf_regs.reg_rsi);
+    return;
+  case T_PGFLT:
+    /* Handle processor exceptions. */
+    page_fault_handler(tf);
+    return;
+  case T_BRKPT:
+    monitor(tf);
+    return;
+  case IRQ_OFFSET + IRQ_SPURIOUS:
+    /* Handle spurious interrupts
+     * The hardware sometimes raises these because of noise on the
+     * IRQ line or other reasons, we don't care */
     cprintf("Spurious interrupt on irq 7\n");
     print_trapframe(tf);
     return;
-  }
-
-  /* All timers are actually routed through this IRQ */
-  if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER || tf->tf_trapno == IRQ_OFFSET + IRQ_CLOCK) {
+  case IRQ_OFFSET + IRQ_TIMER:
+  case IRQ_OFFSET + IRQ_CLOCK:
+    /* All timers are actually routed through this IRQ */
     timer_for_schedule->handle_interrupts();
     sched_yield();
-  }
-
-  print_trapframe(tf);
-  if (!(tf->tf_cs & 0x3)) {
-    panic("unhandled trap in kernel");
-  } else {
+    return;
+  default:
+    print_trapframe(tf);
+    if (!(tf->tf_cs & 0x3))
+        panic("Unhandled trap in kernel");
     env_destroy(curenv);
   }
 }
@@ -157,7 +238,7 @@ trap(struct Trapframe *tf) {
    * of GCC rely on DF being clear */
   asm volatile("cld" ::: "cc");
 
-  // Halt the CPU if some other CPU has called panic()
+  /* Halt the CPU if some other CPU has called panic() */
   extern char *panicstr;
   if (panicstr) asm volatile("hlt");
 
@@ -196,4 +277,21 @@ trap(struct Trapframe *tf) {
    * if doing so makes sense */
   if (curenv && curenv->env_status == ENV_RUNNING) env_run(curenv);
   else sched_yield();
+}
+
+void
+page_fault_handler(struct Trapframe *tf) {
+
+  /* Read processor's CR2 register to find the faulting address */
+  uintptr_t fault_va = rcr2();
+
+  (void)fault_va;
+
+  /* Handle kernel-mode page faults. */
+  // LAB 8: Your code here.
+
+  if (!(tf->tf_err & 4))
+    panic("Kernel pagefault");
+
+  env_destroy(curenv);
 }

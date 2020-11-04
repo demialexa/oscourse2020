@@ -28,6 +28,7 @@ static const char *const error_string[MAXERROR] = {
   [E_FAULT]       = "segmentation fault",
   [E_INVALID_EXE] = "invalid ELF image",
   [E_NO_ENT]      = "entry not found",
+  [E_NO_SYS]      = "no such system call",
 };
 
 /* Print a number (base <= 16) in reverse order,

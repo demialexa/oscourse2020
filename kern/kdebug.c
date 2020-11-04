@@ -48,7 +48,13 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
   info->rip_fn_narg = 0;
 
   if (!addr) return 0;
-  if (addr <= ULIM) panic("Can't search for user-level addresses yet!");
+  
+  /* Temporarily load kernel cr3 and return back once done.
+   * Make sure that you fully understand why it is necessary. */
+  uintptr_t cr3 = rcr3();
+  lcr3(kern_cr3);
+
+  // LAB 8: Your code here:
 
   struct Dwarf_Addrs addrs;
   load_kernel_dwarf_info(&addrs);
@@ -79,6 +85,8 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
   if (res < 0) return res;
   strncpy(info->rip_fn_name, tmp_buf, sizeof(info->rip_fn_name));
   info->rip_fn_namelen = strnlen(info->rip_fn_name, sizeof(info->rip_fn_name));
+
+  lcr3(cr3);
 
   return 0;
 }

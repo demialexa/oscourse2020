@@ -47,4 +47,13 @@ extern void sys_yield(void);
                ENV_TYPE_KERNEL);                          \
   } while (0)
 
+#define ENV_CREATE(x, type)                               \
+  do {                                                    \
+    extern uint8_t ENV_PASTE3(_binary_obj_, x, _start)[]; \
+    extern uintptr_t ENV_PASTE3(_binary_obj_, x, _size);  \
+    env_create(ENV_PASTE3(_binary_obj_, x, _start),       \
+               ENV_PASTE3(_binary_obj_, x, _size),        \
+               type);                                     \
+  } while (0)
+
 #endif // !JOS_KERN_ENV_H
