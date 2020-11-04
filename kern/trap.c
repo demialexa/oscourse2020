@@ -287,6 +287,10 @@ page_fault_handler(struct Trapframe *tf) {
 
   (void)fault_va;
 
+  cprintf("[%08x] user fault va %08lX ip %08lX\n",
+    curenv->env_id, fault_va, tf->tf_rip);
+  print_trapframe(tf);
+
   /* Handle kernel-mode page faults. */
   // LAB 8: Your code here.
 
