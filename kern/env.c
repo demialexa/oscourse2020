@@ -22,7 +22,7 @@ struct Env *curenv = NULL;
 #ifdef CONFIG_KSPACE
 /* All environments */
 struct Env env_array[NENV];
-struct Env *envs   = env_array; 
+struct Env *envs   = env_array;
 #else
 /* All environments */
 struct Env *envs   = NULL;
@@ -266,10 +266,10 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
 #ifdef CONFIG_KSPACE
   env->env_type = ENV_TYPE_KERNEL;
 #else
-  env->env_type      = ENV_TYPE_USER;
+  env->env_type = type;
 #endif
   env->env_status = ENV_RUNNABLE;
-  env->env_runs   = 0;
+  env->env_runs = 0;
 
   /* Clear out all the saved register state,
    * to prevent the register values
@@ -485,7 +485,7 @@ uvpt_shadow_map(struct Env *e) {
  * All this is very similar to what our boot loader does, except the boot
  * loader also needs to read the code from disk.  Take a look at
  * boot/main.c to get ideas.
- * 
+ *
  * Finally, this function maps one page for the program's initial stack.
  *
  * load_icode returns -E_INVALID_EXE if it encounters problems.
@@ -502,19 +502,19 @@ uvpt_shadow_map(struct Env *e) {
  *   ph->p_va.  Any remaining memory bytes should be cleared to zero.
  *   (The ELF header should have ph->p_filesz <= ph->p_memsz.)
  *   Use functions from the previous labs to allocate and map pages.
- * 
+ *
  *   All page protection bits should be user read/write for now.
  *   ELF segments are not necessarily page-aligned, but you can
  *   assume for this function that no two segments will touch
  *   the same page.
- * 
+ *
  *   You may find a function like region_alloc useful.
- * 
+ *
  *   Loading the segments is much simpler if you can move data
  *   directly into the virtual addresses stored in the ELF binary.
  *   So which page directory should be in force during
  *   this function?
- * 
+ *
  *   You must also do something with the program's entry point,
  *   to make sure that the environment starts executing there.
  *   What?  (See env_run() and env_pop_tf() below.) */
@@ -522,8 +522,6 @@ static int
 load_icode(struct Env *env, uint8_t *binary, size_t size) {
   // LAB 3: Your code here:
   // LAB 8: Your code here:
-
-  assert(rcr3() == kern_cr3);
 
   if (size < sizeof(struct Elf)) {
     cprintf("Elf file is too small\n");
@@ -597,6 +595,9 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
     return -E_INVALID_EXE;
   }
 
+  uintptr_t cr3 = rcr3();
+  lcr3(env->env_cr3);
+
   uintptr_t min_addr = UTOP, max_addr = 0;
   for (size_t i = 0; i < elf->e_phnum; i++) {
     if (ph[i].p_type == ELF_PROG_LOAD) {
@@ -611,12 +612,14 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
       size_t filesz = MIN(ph[i].p_filesz, memsz);
 
       if ((uint8_t *)src + filesz > binary + size) {
+        lcr3(cr3);
         cprintf("Section contents exceeds file size: %lu > %lu\n",
                 (unsigned long)((uint8_t *)(src + filesz) - binary), size);
         return -E_INVALID_EXE;
       }
 
       if ((uintptr_t)dst + memsz > UTOP) {
+        lcr3(cr3);
         cprintf("Section contents exceeds user memory: %p > %p\n", (dst + memsz), (void *)UTOP);
         return -E_INVALID_EXE;
       }
@@ -624,6 +627,7 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
       cprintf("Loading section of size 0x%08lX to %p...\n", (unsigned long)filesz, dst);
 
       if (region_alloc(env, dst, memsz)) {
+        lcr3(cr3);
         cprintf("Out of memory");
         return -E_NO_MEM;
       }
@@ -632,6 +636,8 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
       memcpy(dst, src, filesz);
     }
   }
+
+  lcr3(cr3);
 
   if (max_addr <= min_addr || max_addr >= UTOP) {
     cprintf("Invalid memory mappings\n");
