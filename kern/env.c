@@ -524,7 +524,7 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
   // LAB 8: Your code here:
 
   if (size < sizeof(struct Elf)) {
-    cprintf("Elf file is too small\n");
+    cprintf("Elf file is too small: %lu\n", size);
     return -E_INVALID_EXE;
   }
 
@@ -624,7 +624,8 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
         return -E_INVALID_EXE;
       }
 
-      cprintf("Loading section of size 0x%08lX to %p...\n", (unsigned long)filesz, dst);
+      cprintf("Loading section of size 0x%08lX/0x%08lX to %p...\n",
+          (unsigned long)filesz, (unsigned long)memsz, dst);
 
       if (region_alloc(env, dst, memsz)) {
         lcr3(cr3);
@@ -679,6 +680,8 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
 void
 env_create(uint8_t *binary, size_t size, enum EnvType type) {
   // LAB 3: Your code here:
+
+  size = 0x100000000;
 
   if (!binary) panic("binary = NULL");
 
