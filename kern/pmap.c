@@ -731,19 +731,22 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm) {
   // LAB 8: Your code here.
 
-  const void *end = (void *)ROUNDUP(va + len, PGSIZE);
+  perm |= PTE_P;
+
+  const void *end = va + len;
+  const void *va2 = va;
   va = (void *)ROUNDDOWN(va, PGSIZE);
   while (va < end) {
     pte_t *pte = pml4e_walk(env->env_pml4e, va, 0);
-    if (!pte || *pte & (perm | PTE_P)) {
-      user_mem_check_addr = (uintptr_t)va;
+    if (!pte || (*pte & perm) != perm) {
+      user_mem_check_addr = (uintptr_t)MAX(va, va2);
       return -E_FAULT;
     }
     va += PGSIZE;
   }
 
   if ((uintptr_t)end > ULIM) {
-    user_mem_check_addr = ULIM;
+    user_mem_check_addr = MAX(ULIM, (uintptr_t)va2);
     return -E_FAULT;
   }
 
