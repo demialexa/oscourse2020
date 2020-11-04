@@ -21,10 +21,10 @@ sys_cputs(const char *s, size_t len) {
   /* Check that the user has permission to read memory [s, s+len).
    * Destroy the environment if not. */
 
-  if (user_mem_check(curenv, s, len, PTE_U) < 0) {
-      env_destroy(curenv);
-      // maybe return -E_FAULT?
-  }
+  user_mem_assert(curenv, s, len, 0);
+
+  // This would be better...
+  // if (user_mem_check(curenv, s, len, PTE_U) < 0) return -E_FAULT;
 
   while (len-- > 0) cputchar(*s++);
 
@@ -55,13 +55,14 @@ sys_getenvid(void) {
 static int
 sys_env_destroy(envid_t envid) {
   // LAB 8: Your code here.
-  if (ENVX(envid) >= NENV)
+  if (envid && ENVX(envid) >= NENV)
       return -E_BAD_ENV;
 
-  struct Env *env = &envs[ENVX(envid)];
+  struct Env *env = envid ? &envs[ENVX(envid)] : curenv;
   if (env->env_status == ENV_FREE)
       return -E_BAD_ENV;
 
+  cprintf("[%08x] exiting gracefully\n", env->env_id);
   env_destroy(env);
 
   return 0;
