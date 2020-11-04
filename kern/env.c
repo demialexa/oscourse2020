@@ -461,7 +461,7 @@ uvpt_shadow_map(struct Env *e) {
   for (struct PageInfo **link = &uvpt_pages; va < vend; va += PGSIZE) {
     if (!*link) *link = page_alloc(ALLOC_ZERO);
 
-    int res = page_insert(e->env_pml4e, *link, (void *)va_aligned, PTE_U | PTE_W)
+    int res = page_insert(e->env_pml4e, *link, (void *)va, PTE_U | PTE_W)
     if (res < 0) panic("Cannot allocate any memory for uvpt shadow mem");
 
     link = &pg->pp_link;
