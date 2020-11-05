@@ -44,6 +44,7 @@ sys_cgetc(void) {
 static envid_t
 sys_getenvid(void) {
   // LAB 8: Your code here.
+  assert(curenv);
   return curenv->env_id;
 }
 
@@ -55,12 +56,10 @@ sys_getenvid(void) {
 static int
 sys_env_destroy(envid_t envid) {
   // LAB 8: Your code here.
-  if (envid && ENVX(envid) >= NENV)
-      return -E_BAD_ENV;
 
-  struct Env *env = envid ? &envs[ENVX(envid)] : curenv;
-  if (env->env_status == ENV_FREE)
-      return -E_BAD_ENV;
+  struct Env *env;
+  int res = envid2env(envid, &env, 1);
+  if (res < 0) return -E_BAD_ENV;
 
   cprintf("[%08x] exiting gracefully\n", env->env_id);
   env_destroy(env);
