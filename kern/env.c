@@ -267,11 +267,14 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
    * checks involving the RPL and the Descriptor Privilege Level
    * (DPL) stored in the descriptors themselves */
 
+
 #ifdef CONFIG_KSPACE
   e->env_tf.tf_ds = GD_KD | 0;
   e->env_tf.tf_es = GD_KD | 0;
   e->env_tf.tf_ss = GD_KD | 0;
   e->env_tf.tf_cs = GD_KT | 0;
+  /* For now init trapframe with IF set */
+  env->env_tf.tf_rflags = FL_IF | FL_IOPL_0;
 
   // LAB 3: Your code here:
   static uintptr_t stack_top = 0x2000000;
@@ -282,11 +285,11 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
   env->env_tf.tf_es  = GD_UD | 3;
   env->env_tf.tf_ss  = GD_UD | 3;
   env->env_tf.tf_cs  = GD_UT | 3;
+  /* For now init trapframe with IF set */
+  env->env_tf.tf_rflags = FL_IF | FL_IOPL_3;
   env->env_tf.tf_rsp = USTACKTOP;
 #endif
 
-  /* For now init trapframe with IF set */
-  env->env_tf.tf_rflags = FL_IF | FL_IOPL_0;
 
   /* Commit the allocation */
   env_free_list = env->env_link;
