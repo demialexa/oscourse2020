@@ -201,28 +201,9 @@ env_setup_vm(struct Env *env) {
 #define NUSERPML4 1
 
   /* page table pp_ref */
-  pml4e_t *pml4 = kern_pml4e;
-  for (size_t i = NUSERPML4; i < NPMLENTRIES; i++) {
-    if (pml4[i] & PTE_P) {
-      pa2page(PTE_ADDR(pml4[i]))->pp_ref++;
-      pdpe_t *pdpe = KADDR(PTE_ADDR(pml4[i]));
-      for (size_t i = 0; i < NPDPENTRIES; i++) {
-        if (pdpe[i] & PTE_P) {
-          pa2page(PTE_ADDR(pdpe[i]))->pp_ref++;
-          pde_t *pde = KADDR(PTE_ADDR(pdpe[i]));
-          for (size_t i = 0; i < NPDENTRIES; i++) {
-            if (pde[i] & PTE_P) {
-              pa2page(PTE_ADDR(pde[i]))->pp_ref++;
-              pte_t *pte = KADDR(PTE_ADDR(pde[i]));
-              for (size_t i = 0; i < NPDPENTRIES; i++)
-                if (pte[i] & PTE_P)
-                  pa2page(PTE_ADDR(pte[i]))->pp_ref++;
-            }
-          }
-        }
-      }
-    }
-  }
+  for (size_t i = NUSERPML4; i < NPMLENTRIES; i++)
+    if (kern_pml4e[i] & PTE_P)
+      pa2page(PTE_ADDR(kern_pml4[i]))->pp_ref++;
 
   env->env_pml4e = page2kva(pi);
   env->env_cr3 = page2pa(pi);
