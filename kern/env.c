@@ -203,7 +203,7 @@ env_setup_vm(struct Env *env) {
   /* page table pp_ref */
   for (size_t i = NUSERPML4; i < NPMLENTRIES; i++)
     if (kern_pml4e[i] & PTE_P)
-      pa2page(PTE_ADDR(kern_pml4[i]))->pp_ref++;
+      pa2page(PTE_ADDR(kern_pml4e[i]))->pp_ref++;
 
   env->env_pml4e = page2kva(pi);
   env->env_cr3 = page2pa(pi);
