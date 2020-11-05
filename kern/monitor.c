@@ -73,6 +73,9 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   // LAB 2: Your code here:
 
+  uintptr_t cr3 = rcr3();
+  if (curenv && curenv->env_cr3) lcr3(curenv->env_cr3);
+
   uintptr_t rip, *rbp;
 
   /* Read current address and current stack frame */
@@ -92,6 +95,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
     rbp = (uintptr_t *)rbp[0];
   } while (rbp);
 
+  lcr3(cr3);
   return 0;
 }
 
