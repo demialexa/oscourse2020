@@ -28,6 +28,42 @@ load_kernel_dwarf_info(struct Dwarf_Addrs *addrs) {
   addrs->pubtypes_end   = (uint8_t *)(uefi_lp->DebugPubtypesEnd);
 }
 
+void
+load_user_dwarf_info(struct Dwarf_Addrs *addrs) {
+  assert(curenv);
+
+  uint8_t *binary = curenv->binary;
+  struct Elf *elf = (struct Elf *)binary;
+  struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
+  const char *shstr = (char *)binary + sh[elf->e_shstrndx].sh_offset;
+
+  struct {
+    const uint8_t **start;
+    const uint8_t **end;
+    const char *name;
+  } p[] = {
+    {&addrs->aranges_end, &addrs->aranges_begin, ".debug_aranges"},
+    {&addrs->abbrev_end, &addrs->abbrev_begin, ".debug_abbrev"},
+    {&addrs->info_end, &addrs->info_begin, ".debug_info"},
+    {&addrs->line_end, &addrs->line_begin, ".debug_line"},
+    {&addrs->str_end, &addrs->str_begin, ".debug_str"},
+    {&addrs->pubnames_end, &addrs->pubnames_begin, ".debug_pubnames"},
+    {&addrs->pubtypes_end, &addrs->pubtypes_begin, ".debug_pubtypes"},
+  };
+
+  memset(addrs, 0, sizeof(*addrs));
+
+  for (size_t i = 0; i < elf->e_shnum; i++) {
+    for (size_t k = 0; k < sizeof(p)/sizeof(*p); k++) {
+      if (!strcmp(&shstr[sh[i].sh_name], p[i].name)) {
+          *p[i].start = binary + sh[i].sh_offset;
+          *p[i].end = *p[i].start + sh[i].sh_size;
+          cprintf("Found: %s", &shstr[sh[i].sh_name]);
+      }
+    }
+  }
+}
+
 #define UNKNOWN "<unknown>"
 #define CALL_INSN_LEN 5
 
@@ -57,7 +93,8 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
   // LAB 8: Your code here:
 
   struct Dwarf_Addrs addrs;
-  load_kernel_dwarf_info(&addrs);
+
+  (addr < ULIM ? load_user_dwarf_info : load_kernel_dwarf_info)(&addrs);
 
   Dwarf_Off offset = 0, line_offset = 0;
   int res = info_by_address(&addrs, addr, &offset);
