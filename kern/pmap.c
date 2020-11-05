@@ -324,6 +324,8 @@ kasan_mem_init(void) {
 
         int res = page_insert(kern_pml4e, pg, (void *)virt_addr, PTE_W);
         if (res < 0) panic("Cannot allocate any memory for page directory allocation");
+
+        page_decref(pg);
       }
     }
   }
