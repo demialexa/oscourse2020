@@ -663,8 +663,6 @@ void
 env_create(uint8_t *binary, size_t size, enum EnvType type) {
   // LAB 3: Your code here:
 
-  size = 0x100000000;
-
   if (!binary) panic("binary = NULL");
 
   struct Env *newenv;
