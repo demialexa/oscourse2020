@@ -165,6 +165,34 @@ env_init(void) {
   env_init_percpu();
 }
 
+/* Allocate len bytes of physical memory for environment env,
+ * and map it at virtual address va in the environment's address space.
+ * Does not zero or otherwise initialize the mapped pages in any way.
+ * Pages should be writable by user and kernel.
+ * Panic if any allocation attempt fails. */
+static int
+region_alloc(struct Env *env, void *va, size_t len) {
+  // LAB 8: Your code here:
+  /* (But only if you need it for load_icode.)
+   *
+   * Hint: It is easier to use region_alloc if the caller can pass
+   *   'va' and 'len' values that are not page-aligned.
+   *   You should round va down, and round (va + len) up.
+   *   (Watch out for corner-cases!) */
+
+  void *end = ROUNDUP(va + len, PGSIZE);
+  va = (void *)ROUNDDOWN(va, PGSIZE);
+  len = end - va;
+
+  for (size_t i = 0; i < len; i += PGSIZE, va += PGSIZE) {
+      struct PageInfo *pi = page_alloc(0);
+      if (!pi) return -E_NO_MEM;
+      page_insert(env->env_pml4e, pi, va, PTE_U | PTE_W);
+  }
+
+  return 0;
+}
+
 /* Initialize the kernel virtual memory layout for environment e.
  * Allocate a page directory, set e->env_pgdir accordingly,
  * and initialize the kernel portion of the new environment's address space.
@@ -212,6 +240,30 @@ env_setup_vm(struct Env *env) {
   memcpy(env->env_pml4e + NUSERPML4, kern_pml4e + NUSERPML4,
           PGSIZE - NUSERPML4 * sizeof(pml4e_t));
   memset(env->env_pml4e, 0, NUSERPML4 * sizeof(pml4e_t));
+
+  int res;
+
+  /* Allocate stack for new task */
+  res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)(UXSTACKTOP - UXSTACKSIZE), UXSTACKSIZE);
+  if (res < 0) return res;
+
+#ifdef SANITIZE_USER_SHADOW_BASE
+  void uvpt_shadow_map(struct Env *e);
+  uvpt_shadow_map(env);
+  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
+  if (res < 0) return res;
+#endif
+
+
+
 
   return 0;
 }
@@ -404,39 +456,11 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
   return 0;
 }
 
-/* Allocate len bytes of physical memory for environment env,
- * and map it at virtual address va in the environment's address space.
- * Does not zero or otherwise initialize the mapped pages in any way.
- * Pages should be writable by user and kernel.
- * Panic if any allocation attempt fails. */
-static int
-region_alloc(struct Env *env, void *va, size_t len) {
-  // LAB 8: Your code here:
-  /* (But only if you need it for load_icode.)
-   *
-   * Hint: It is easier to use region_alloc if the caller can pass
-   *   'va' and 'len' values that are not page-aligned.
-   *   You should round va down, and round (va + len) up.
-   *   (Watch out for corner-cases!) */
-
-  void *end = ROUNDUP(va + len, PGSIZE);
-  va = (void *)ROUNDDOWN(va, PGSIZE);
-  len = end - va;
-
-  for (size_t i = 0; i < len; i += PGSIZE, va += PGSIZE) {
-      struct PageInfo *pi = page_alloc(0);
-      if (!pi) return -E_NO_MEM;
-      page_insert(env->env_pml4e, pi, va, PTE_U | PTE_W);
-  }
-
-  return 0;
-}
-
 #ifdef SANITIZE_USER_SHADOW_BASE
 
 /* Map UVP shadow memory and create pages if necessary */
 struct PageInfo *uvpt_pages = NULL;
-static void
+void
 uvpt_shadow_map(struct Env *e) {
   uintptr_t va = ROUNDDOWN((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE, PGSIZE);
   uintptr_t vend = ROUNDUP((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PGSIZE);
@@ -641,13 +665,6 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
   if (res < 0) {
     cprintf("Failed to bind functions: %i\n", res);
     return res;
-  }
-
-  /* Allocate stack for new task */
-  res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
-  if (res < 0) {
-      cprintf("Out of memory");
-      return res;
   }
 
   return 0;
