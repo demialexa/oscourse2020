@@ -238,7 +238,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
   return 0;
 }
 
-#ifdef CONFIG_KSPACE
+//#ifdef CONFIG_KSPACE
 static void
 bind_functions(struct Env *e, struct Elf *elf) {
   //find_function from kdebug.c should be used
@@ -253,7 +253,7 @@ bind_functions(struct Env *e, struct Elf *elf) {
       strtab = i;
       break;
     }
-  } 
+  }
   const char *strings = (char *)elf + sh[strtab].sh_offset;
 
   for (size_t i = 0; i < elf->e_shnum; i++) {
@@ -277,7 +277,7 @@ bind_functions(struct Env *e, struct Elf *elf) {
     }
   }
 }
-#endif
+//#endif
 
 //
 // Set up the initial program binary, stack, and processor flags

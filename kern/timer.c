@@ -247,7 +247,6 @@ hpet_enable_interrupts_tim0(void) {
   hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
   hpetReg->TIM0_CONF |= HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF;
   hpetReg->TIM0_COMP = Giga * 500 / hpetFemto;
-  hpet_print_reg();
   irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_TIMER));
 }
 

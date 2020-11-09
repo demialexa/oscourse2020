@@ -24,7 +24,7 @@ sched_yield(void) {
   // below to halt the cpu.
 
   // LAB 3: Your code here.
-  uint32_t id = curenv ? ENVX(curenv_getid()) : -1;
+  uint32_t id = curenv ? ENVX(curenv_getid()) : 0;
   uint32_t orig = id;
   do {
     id = (id + 1) % NENV;
