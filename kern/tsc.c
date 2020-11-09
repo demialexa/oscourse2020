@@ -3,6 +3,7 @@
 #include <inc/x86.h>
 #include <inc/stdio.h>
 #include <inc/string.h>
+#include "inc/assert.h"
 
 #include <kern/tsc.h>
 #include <kern/timer.h>
@@ -198,23 +199,53 @@ print_timer_error(void) {
   cprintf("Timer Error\n");
 }
 
+uint64_t get_tsc() {
+  uint64_t result;
+  asm (
+    "rdtsc \n\t"
+    "shl $32, %%rdx \n\t"
+    "or %%rdx, %0 \n\t"
+    : "=a" (result)
+    :
+    : "ebx"
+  );
+  return result;
+}
+
 // LAB 5: Your code here
 // Use print_time function to print timert result.
 // Use print_timer_error function to print error.
 static bool timer_started = 0;
 static int timer_id       = -1;
 static uint64_t timer     = 0;
+
 void
 timer_start(const char *name) {
-  (void) timer_started;
-  (void) timer_id;
-  (void) timer;
+  timer_started = 1;
+  timer = read_tsc();
+  if (!cpu_freq)
+    timer_cpu_frequency(name);
 }
 
 void
 timer_stop(void) {
+  if (!timer_started) {
+    print_timer_error();
+    return;
+  }
+  timer_started = 0;
+  print_time((read_tsc() - timer) / cpu_freq);
 }
 
 void
 timer_cpu_frequency(const char *name) {
+  for (int i = 0; i < MAX_TIMERS; i++) {
+    if (!strcmp(timertab[i].timer_name, name)) {
+      timer_id = i;
+      break;
+    }
+  }
+  if (timer_id == -1)
+    panic("timer_cpu_frequency\n");
+  cpu_freq = timertab[timer_id].get_cpu_freq();
 }

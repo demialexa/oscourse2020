@@ -270,7 +270,8 @@ bind_functions(struct Env *e, struct Elf *elf) {
           uintptr_t addr = find_function(name);
 
           if (addr)
-            memcpy((void *)syms[j].st_value, &addr, sizeof(void *));
+            *(uintptr_t*)syms[j].st_value = addr;
+            //memcpy((void *)syms[j].st_value, &addr, sizeof(void *));
         }
       }
     }

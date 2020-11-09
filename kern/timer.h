@@ -7,6 +7,13 @@
 #error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
+#define kilo      (1000ULL)
+#define Mega      (kilo * kilo)
+#define Giga      (kilo * Mega)
+#define Tera      (kilo * Giga)
+#define Peta      (kilo * Tera)
+#define ULONG_MAX ~0UL
+
 #include <inc/types.h>
 
 struct Timer {

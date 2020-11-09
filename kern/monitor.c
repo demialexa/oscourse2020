@@ -31,6 +31,9 @@ static struct Command commands[] = {
     {"hello", "Display greeting message", mon_hello},
     {"kerninfo", "Display information about the kernel", mon_kerninfo},
     {"backtrace", "Print stack backtrace", mon_backtrace},
+    {"timer_start", "Start timer", mon_start},
+    {"timer_stop", "Stop timer; print elapsed time", mon_stop},
+    {"timer_freq", "Print cpu frequency", mon_frequency},
     {"text", "Print 'text'", mon_text}};
 #define NCOMMANDS (sizeof(commands) / sizeof(commands[0]))
 
@@ -97,6 +100,23 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
 
 // LAB 5: Your code here.
 // Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
+int mon_start(int argc, char **argv, struct Trapframe *tf) {
+  char *name = argc == 1 ? "hpet0" : argv[1];
+  timer_start(name);
+  return 0;
+}
+
+int mon_stop(int argc, char **argv, struct Trapframe *tf) {
+  timer_stop();
+  return 0;
+}
+
+int mon_frequency(int argc, char **argv, struct Trapframe *tf) {
+  char *name = argc == 1 ? "hpet0" : argv[1];
+  timer_cpu_frequency(name);
+  cprintf("%lli MGz\n", cpu_freq / Mega);
+  return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 

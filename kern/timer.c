@@ -9,13 +9,8 @@
 #include <kern/kclock.h>
 #include <kern/picirq.h>
 #include <kern/trap.h>
+#include "kern/tsc.h"
 
-#define kilo      (1000ULL)
-#define Mega      (kilo * kilo)
-#define Giga      (kilo * Mega)
-#define Tera      (kilo * Giga)
-#define Peta      (kilo * Tera)
-#define ULONG_MAX ~0UL
 
 #if LAB <= 6
 // Early variant of memory mapping that does 1:1 aligned area mapping
@@ -108,14 +103,42 @@ get_rsdp(void) {
 // Obtain and map FADT ACPI table address.
 FADT *
 get_fadt(void) {
-  return NULL;
+  RSDP *rsdp = get_rsdp();
+  RSDT *rsdt = NULL;
+  memcpy(&rsdt, &rsdp->RsdtAddress, sizeof(uint32_t));
+  assert((uintptr_t)rsdt == rsdp->RsdtAddress);
+  uint32_t *pointer = rsdt->PointerToOtherSDT;
+  uint32_t length = rsdt->h.Length;
+  int32_t fadt_idx = -1;
+  for (uint32_t i = 0; i < length; i++) {
+    if (!memcmp((void *)(uintptr_t)pointer[i], "FACP", 4)) {
+      fadt_idx = i;
+      break;
+    }
+  }
+  FADT *fadt = fadt_idx == -1 ? 0 : (void *)(uintptr_t)pointer[fadt_idx];
+  return fadt;
 }
 
 // LAB 5: Your code here.
 // Obtain and map RSDP ACPI table address.
 HPET *
 get_hpet(void) {
-  return NULL;
+  RSDP *rsdp = get_rsdp();
+  RSDT *rsdt = NULL;
+  memcpy(&rsdt, &rsdp->RsdtAddress, sizeof(uint32_t));
+  assert((uint64_t)rsdt == rsdp->RsdtAddress);
+  uint32_t *pointer = rsdt->PointerToOtherSDT;
+  uint32_t length = rsdt->h.Length;
+  int32_t hpet_idx = -1;
+  for (uint32_t i = 0; i < length; i++) {
+    if (!memcmp((void *)(uintptr_t)pointer[i], "HPET", 4)) {
+      hpet_idx = i;
+      break;
+    }
+  }
+  HPET *hpet = hpet_idx == -1 ? 0 : (void *)(uintptr_t)pointer[hpet_idx];
+  return hpet;
 }
 
 // Getting physical HPET timer address from its table.
@@ -212,12 +235,28 @@ hpet_get_main_cnt(void) {
 // Hint: to be able to use HPET as PIT replacement consult
 // LegacyReplacement functionality in HPET spec.
 
+
+#define HPET_TN_TYPE_CNF (1 << 3)
+#define HPET_TN_INT_ENB_CNF (1 << 2)
+#define HPET_TN_VAL_SET_CNF (1 << 6)
+#define HPET_LEG_RT_CNF (1 << 1)
+#define HPET_ENABLE_CNF 1
+
 void
 hpet_enable_interrupts_tim0(void) {
+  hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
+  hpetReg->TIM0_CONF |= HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF;
+  hpetReg->TIM0_COMP = Giga * 500 / hpetFemto;
+  hpet_print_reg();
+  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_TIMER));
 }
 
 void
 hpet_enable_interrupts_tim1(void) {
+  hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
+  hpetReg->TIM1_CONF |= HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF;
+  hpetReg->TIM1_COMP = Giga * 1500 / hpetFemto;
+  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
 }
 
 void
@@ -236,7 +275,23 @@ hpet_handle_interrupts_tim1(void) {
 // about pause instruction.
 uint64_t
 hpet_cpu_frequency(void) {
-  return 0;
+  uint64_t ticks_in_milisecond = Tera / hpetFemto, ticks_elapsed = 0, t2;
+  uint64_t t1 = hpet_get_main_cnt();
+  uint64_t tsc0 = read_tsc();
+
+  do {
+    asm ("pause \t\n");
+    t2 = hpet_get_main_cnt();
+    ticks_elapsed += t2 - t1;
+    t1 = t2;
+  } while (ticks_elapsed < ticks_in_milisecond);
+
+  uint64_t tsc_elapsed = read_tsc() - tsc0;
+  // freq = Peta (=10^15) / cycle_time (in femtoseconds)
+  // cycle_time = time_elapsed / tsc_elapsed
+  // time_elapsed = ticks_elapsed * hpetFemto
+
+  return Peta / ticks_elapsed / hpetFemto  * tsc_elapsed;
 }
 
 uint32_t
@@ -253,5 +308,23 @@ pmtimer_get_timeval(void) {
 // can be 24-bit or 32-bit.
 uint64_t
 pmtimer_cpu_frequency(void) {
+  uint64_t ticks_in_milisecond = PM_FREQ / kilo, ticks_elapsed = 0, t2;
+  uint64_t t1 = pmtimer_get_timeval();
+  uint64_t tsc0 = get_tsc();
+
+  do {
+    asm ("pause \t\n");
+    t2 = pmtimer_get_timeval();
+    ticks_elapsed += t2 - t1;
+    t1 = t2;
+  } while (ticks_elapsed < ticks_in_milisecond);
+
+  uint64_t tsc_elapsed = get_tsc() - tsc0;
+  // freq = Peta (=10^15) / cycle_time (in femtoseconds) = Peta / time_elapsed * tsc_elapsed =
+  // = Peta / ticks_elapsed / Peta * PM_FREQ * tsc_elapsed = PM_FREQ * tsc_elapsed / ticks_elapsed
+  // cycle_time = time_elapsed / tsc_elapsed
+  // time_elapsed = ticks_elapsed * Peta / PM_FREQ
+
+  return PM_FREQ * tsc_elapsed / ticks_elapsed;
   return 0;
 }
