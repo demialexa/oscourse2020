@@ -326,21 +326,6 @@ page_init(void) {
   //     is free.
   // LAB 6
 
-#if 0
-  pages[2].pp_ref = 0;
-  page_free_list  = &pages[2];
-  last            = &pages[2];
-  for (i = 2; i < npages_basemem; i++) {
-    if (is_page_allocatable(i)) {
-      pages[i].pp_ref = 0;
-      last->pp_link   = &pages[i];
-      last            = &pages[i];
-    } else {
-      pages[i].pp_ref  = 1;
-      pages[i].pp_link = NULL;
-    }
-  } 
-#endif
   pages[1].pp_ref = 0;
   page_free_list  = &pages[1];
   last            = &pages[1];
@@ -361,7 +346,6 @@ page_init(void) {
     pages[i].pp_ref  = 1;
     pages[i].pp_link = NULL;
   }
-
   //     Some of it is in use, some is free. Where is the kernel
   //     in physical memory?  Which pages are already in use for
   //     page tables and other data structures?
