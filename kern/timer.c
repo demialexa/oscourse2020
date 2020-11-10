@@ -10,6 +10,7 @@
 #include <kern/picirq.h>
 #include <kern/trap.h>
 #include "kern/tsc.h"
+#include <kern/pmap.h>
 
 
 #if LAB <= 6
@@ -99,10 +100,90 @@ get_rsdp(void) {
   return krsdp;
 }
 
+// LAB 5 (done in LAB 7)
+static void *
+acpi_find_table(const char *sign) {
+  static RSDT *krsdt;
+  static size_t krsdt_len;
+  static size_t krsdt_entsz;
+
+  uint8_t cksm = 0;
+
+  if (!krsdt) {
+    if (!uefi_lp->ACPIRoot) {
+      panic("No rsdp\n");
+    }
+    RSDP *krsdp = mmio_map_region(uefi_lp->ACPIRoot, sizeof(RSDP));
+
+    if (strncmp(krsdp->Signature, "RSD PTR", 8))
+      // panic("Invalid RSDP");
+
+      for (size_t i = 0; i < offsetof(RSDP, Length); i++)
+        cksm = (uint8_t)(cksm + ((uint8_t *)krsdp)[i]);
+    if (cksm)
+      panic("Invalid RSDP");
+
+    uint64_t rsdt_pa = krsdp->RsdtAddress;
+    krsdt_entsz      = 4;
+
+    if (krsdp->Revision) {
+      /* ACPI version >= 2.0 */
+      for (size_t i = 0; i < krsdp->Length; i++)
+        cksm = (uint8_t)(cksm + ((uint8_t *)krsdp)[i]);
+      if (cksm)
+        panic("Invalid RSDP");
+
+      rsdt_pa     = krsdp->XsdtAddress;
+      krsdt_entsz = 8;
+    }
+
+    krsdt = mmio_map_region(rsdt_pa, sizeof(RSDT));
+    /* Remap since we can obtain table length only after mapping */
+    krsdt = mmio_remap_last_region(rsdt_pa, krsdt, sizeof(RSDP), krsdt->h.Length);
+
+    for (size_t i = 0; i < krsdt->h.Length; i++)
+      cksm = (uint8_t)(cksm + ((uint8_t *)krsdt)[i]);
+
+    if (cksm)
+      panic("Invalid RSDP");
+
+    if (strncmp(krsdt->h.Signature, krsdp->Revision ? "XSDT" : "RSDT", 4))
+      panic("Invalid RSDT");
+
+    krsdt_len = (krsdt->h.Length - sizeof(RSDT)) / 4;
+    if (krsdp->Revision) {
+      krsdt_len = krsdt_len / 2;
+    }
+  }
+
+  ACPISDTHeader *hd = NULL;
+
+  for (size_t i = 0; i < krsdt_len; i++) {
+    /* Assume little endian */
+    uint64_t fadt_pa = 0;
+    memcpy(&fadt_pa, (uint8_t *)krsdt->PointerToOtherSDT + i * krsdt_entsz, krsdt_entsz);
+
+    hd = mmio_map_region(fadt_pa, sizeof(ACPISDTHeader));
+    /* Remap since we can obtain table length only after mapping */
+    hd = mmio_remap_last_region(fadt_pa, hd, sizeof(ACPISDTHeader), krsdt->h.Length);
+
+    for (size_t i = 0; i < hd->Length; i++)
+      cksm = (uint8_t)(cksm + ((uint8_t *)hd)[i]);
+    if (cksm)
+      panic("ACPI table '%.4s' invalid", hd->Signature);
+    if (!strncmp(hd->Signature, sign, 4))
+      return hd;
+  }
+
+  return NULL;
+}
+// LAB 5 done
+
 // LAB 5: Your code here.
 // Obtain and map FADT ACPI table address.
 FADT *
 get_fadt(void) {
+#if 0
   RSDP *rsdp = get_rsdp();
   RSDT *rsdt = NULL;
   memcpy(&rsdt, &rsdp->RsdtAddress, sizeof(uint32_t));
@@ -118,12 +199,21 @@ get_fadt(void) {
   }
   FADT *fadt = fadt_idx == -1 ? 0 : (void *)(uintptr_t)pointer[fadt_idx];
   return fadt;
+#endif
+  static FADT *kfadt;
+
+  if (!kfadt) {
+    kfadt = acpi_find_table("FACP");
+  }
+  return kfadt;
+// LAB 5 done
 }
 
 // LAB 5: Your code here.
 // Obtain and map RSDP ACPI table address.
 HPET *
 get_hpet(void) {
+#if 0
   RSDP *rsdp = get_rsdp();
   RSDT *rsdt = NULL;
   memcpy(&rsdt, &rsdp->RsdtAddress, sizeof(uint32_t));
@@ -139,6 +229,13 @@ get_hpet(void) {
   }
   HPET *hpet = hpet_idx == -1 ? 0 : (void *)(uintptr_t)pointer[hpet_idx];
   return hpet;
+#endif
+  static HPET *khpet;
+  if (!khpet) {
+    khpet = acpi_find_table("HPET");
+  }
+  return khpet;
+// LAB 5 done
 }
 
 // Getting physical HPET timer address from its table.
