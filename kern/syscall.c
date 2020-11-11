@@ -92,6 +92,8 @@ sys_exofork(void) {
   if (res < 0) return res;
 
   env->env_status = ENV_NOT_RUNNABLE;
+  env->env_tf = curenv->env_tf;
+  env->env_tf.tf_regs.reg_rax = 0;
 
   return env->env_id;
 }

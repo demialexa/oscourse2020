@@ -245,21 +245,6 @@ env_setup_vm(struct Env *env) {
 
   env->env_pml4e[PML4(UVPT)] = env->env_cr3 | PTE_P | PTE_U;
 
-  if ((pi = page_alloc(ALLOC_ZERO)) < 0) return -E_NO_MEM;
-  pte_t *uvpdpe = ((uintptr_t *)page2kva(pi));
-  env->env_pml4e[PML4(UVPD)] = page2pa(pi) | PTE_P | PTE_U;
-  uvpdpe[PDPE(UVPD)] = kern_cr3 | PTE_P | PTE_U;
-
-  if ((pi = page_alloc(ALLOC_ZERO)) < 0) return -E_NO_MEM;
-  pte_t *uvpde = ((uintptr_t *)page2kva(pi));
-  uvpdpe[PDPE(UVPDE)] = page2pa(pi) | PTE_P | PTE_U;
-  uvpde[PDX(UVPDE)] = kern_cr3 | PTE_P | PTE_U;
-
-  if ((pi = page_alloc(ALLOC_ZERO)) < 0) return -E_NO_MEM;
-  pte_t *uvpte = ((uintptr_t *)page2kva(pi));
-  uvpde[PDX(UVPML4)] = page2pa(pi) | PTE_P | PTE_U;
-  uvpte[PTX(UVPML4)] = kern_cr3 | PTE_P | PTE_U;
-
   return 0;
 }
 
