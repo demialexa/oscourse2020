@@ -38,8 +38,8 @@ load_user_dwarf_info(struct Dwarf_Addrs *addrs) {
   const char *shstr = (char *)binary + sh[elf->e_shstrndx].sh_offset;
 
   struct {
-    const uint8_t **start;
     const uint8_t **end;
+    const uint8_t **start;
     const char *name;
   } p[] = {
     {&addrs->aranges_end, &addrs->aranges_begin, ".debug_aranges"},
@@ -55,10 +55,9 @@ load_user_dwarf_info(struct Dwarf_Addrs *addrs) {
 
   for (size_t i = 0; i < elf->e_shnum; i++) {
     for (size_t k = 0; k < sizeof(p)/sizeof(*p); k++) {
-      if (!strcmp(&shstr[sh[i].sh_name], p[i].name)) {
-          *p[i].start = binary + sh[i].sh_offset;
-          *p[i].end = *p[i].start + sh[i].sh_size;
-          cprintf("Found: %s", &shstr[sh[i].sh_name]);
+      if (!strcmp(&shstr[sh[i].sh_name], p[k].name)) {
+          *p[k].start = binary + sh[i].sh_offset;
+          *p[k].end = *p[k].start + sh[i].sh_size;
       }
     }
   }

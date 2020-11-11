@@ -525,7 +525,7 @@ lookup_alloc_ent(pte_t *ent, bool alloc) {
 }
 
 /* Find page table item */
-static pte_t *
+pte_t *
 pml4e_walk(pml4e_t *pml4e, const void *va, bool alloc) {
   // LAB 7: Fill this function in
   pdpe_t *pdpe = lookup_alloc_ent(&pml4e[PML4(va)], alloc);

@@ -74,16 +74,24 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   // LAB 2: Your code here:
 
   uintptr_t cr3 = rcr3();
-  if (curenv && curenv->env_cr3) lcr3(curenv->env_cr3);
+  cprintf("%p %p %p\n", (void *)cr3, (void *)curenv->env_cr3, (void *)kern_cr3);
 
   uintptr_t rip, *rbp;
+  extern pte_t *pml4e_walk(pml4e_t *pml4e, const void *va, bool alloc);
 
   /* Read current address and current stack frame */
   rbp = (uintptr_t *)read_rbp();
 
   cprintf("Stack backtrace: \n");
   do {
+    pte_t *pte = pml4e_walk(KADDR(cr3), rbp, 0);
+    if (!pte || !(*pte & PTE_P)) {
+      cprintf("<Unreadable memory>\n");
+      return 1;
+    }
+
     rip = rbp[1];
+
     struct Ripdebuginfo info;
     debuginfo_rip(rip, &info);
 
@@ -95,7 +103,6 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
     rbp = (uintptr_t *)rbp[0];
   } while (rbp);
 
-  lcr3(cr3);
   return 0;
 }
 
@@ -217,7 +224,7 @@ monitor(struct Trapframe *tf) {
   cprintf("Type 'help' for a list of commands.\n");
 
   if (tf) print_trapframe(tf);
-  
+
   char *buf;
   do buf = readline("K> ");
   while (!buf || runcmd(buf, tf) >= 0);

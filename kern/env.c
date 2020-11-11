@@ -181,13 +181,15 @@ region_alloc(struct Env *env, void *va, size_t len) {
    *   (Watch out for corner-cases!) */
 
   void *end = ROUNDUP(va + len, PGSIZE);
-  va = (void *)ROUNDDOWN(va, PGSIZE);
+  va = ROUNDDOWN(va, PGSIZE);
   len = end - va;
+  cprintf ("region: %p %lu -> %p\n", va, len, end);
 
   for (size_t i = 0; i < len; i += PGSIZE, va += PGSIZE) {
       struct PageInfo *pi = page_alloc(0);
       if (!pi) return -E_NO_MEM;
       page_insert(env->env_pml4e, pi, va, PTE_U | PTE_W);
+      page_decref(pi);
   }
 
   return 0;
