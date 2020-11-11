@@ -343,6 +343,11 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
   /* For now init trapframe with IF set */
   env->env_tf.tf_rflags = FL_IF | FL_IOPL_0;
 
+  /* Clear the page fault handler until user installs one. */
+  env->env_pgfault_upcall = 0;
+
+  /* Also clear the IPC receiving flag. */
+  env->env_ipc_recving = 0;
 
   /* Commit the allocation */
   env_free_list = env->env_link;
