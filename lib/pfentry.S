@@ -70,6 +70,8 @@ _pgfault_upcall:
     # can no longer modify any general-purpose registers.
 
     popq %r15
+    popq %r15
+    popq %r15
     popq %r14
     popq %r13
     popq %r12
@@ -83,9 +85,10 @@ _pgfault_upcall:
     popq %rdx
     popq %rcx
 
-    movq 32(%rsp), %rbx
-    movq 16(%rsp), %rax
+    movq 32(%rsp), %rbx # utf_rsp
+    movq 16(%rsp), %rax # utf_rip
     subq $8, %rbx
+    movq %rax, (%rbx)
     movq %rbx, 32(%rsp)
 
     popq %rbx
