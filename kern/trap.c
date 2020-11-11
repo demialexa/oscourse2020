@@ -297,8 +297,6 @@ page_fault_handler(struct Trapframe *tf) {
   if (!(tf->tf_err & 4))
     panic("Kernel pagefault");
 
-  env_destroy(curenv);
-
   /* We've already handled kernel-mode exceptions, so if we get here,
    * the page fault happened in user mode.
    * 
@@ -330,5 +328,24 @@ page_fault_handler(struct Trapframe *tf) {
    *   To change what the user environment runs, modify 'curenv->env_tf'
    *   (the 'tf' variable points at 'curenv->env_tf'). */
 
+
   // LAB 9: Your code here:
+
+  struct UTrapframe *utf = (struct UTrapframe *)(curenv->env_tf.tf_rsp < UXSTACKTOP &&
+    UXSTACKTOP - curenv->env_tf.tf_rsp < UXSTACKSIZE ? curenv->env_tf.tf_rsp - sizeof(void *) : UXSTACKTOP) - 1;
+
+  user_mem_assert(curenv, utf, sizeof(*utf) + sizeof(utf), PTE_U);
+  user_mem_assert(curenv, curenv->env_pgfault_upcall, 1, PTE_U);
+
+  utf->utf_fault_va = fault_va;
+  utf->utf_err = tf->tf_err;
+  utf->utf_rip = tf->tf_rip;
+  utf->utf_rsp = tf->tf_rsp;
+  utf->utf_rflags = tf->tf_rflags;
+  utf->utf_regs = tf->tf_regs;
+
+  tf->tf_rsp = (uintptr_t)utf;
+  tf->tf_rip = (uintptr_t)curenv->env_pgfault_upcall;
+
+  env_run(curenv);
 }

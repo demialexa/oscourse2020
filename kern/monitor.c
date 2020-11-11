@@ -77,7 +77,6 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   cprintf("%p %p %p\n", (void *)cr3, (void *)curenv->env_cr3, (void *)kern_cr3);
 
   uintptr_t rip, *rbp;
-  extern pte_t *pml4e_walk(pml4e_t *pml4e, const void *va, bool alloc);
 
   /* Read current address and current stack frame */
   rbp = (uintptr_t *)read_rbp();

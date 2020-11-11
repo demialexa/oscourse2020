@@ -172,6 +172,22 @@ mem_init(void) {
   /* Permissions: kernel R, user R */
   kern_pml4e[PML4(UVPT)] = kern_cr3 | PTE_P | PTE_U;
 
+  pte_t *uvpd = boot_alloc(PGSIZE);
+  memset(uvpd, 0, PGSIZE);
+  kern_pml4e[PML4(UVPD)] = PADDR(uvpd) | PTE_P | PTE_U;
+  uvpd[0] = kern_cr3 | PTE_P | PTE_U;
+
+  pte_t *uvpdp = boot_alloc(PGSIZE);
+  memset(uvpdp, 0, PGSIZE);
+  uvpd[1] = PADDR(uvpdp) | PTE_P | PTE_U;
+  uvpdp[0] = kern_cr3 | PTE_P | PTE_U;
+
+  pte_t *uvpml4 = boot_alloc(PGSIZE);
+  memset(uvpml4, 0, PGSIZE);
+  uvpdp[1] = PADDR(uvpml4) | PTE_P | PTE_U;
+  uvpml4[0] = kern_cr3 | PTE_P | PTE_U;
+
+
   /* Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
    * The kernel uses this array to keep track of physical pages: for
    * each physical page, there is a corresponding struct PageInfo in this
@@ -210,13 +226,13 @@ mem_init(void) {
   // LAB 7: Your code goes here:
 
   boot_map_region(kern_pml4e, UPAGES, pages_size, PADDR(pages), PTE_U);
-  
+
   /* Map the 'envs' array read-only by the user at linear address UENVS
    * (ie. perm = PTE_U | PTE_P).
    * Permissions:
    *    - the new image at UENVS  -- kernel R, user R
    *    - envs itself -- kernel RW, user NONE */
-   // LAB 8: Your code here: 
+   // LAB 8: Your code here:
 
   boot_map_region(kern_pml4e, UENVS, envs_size, PADDR(envs), PTE_U);
 

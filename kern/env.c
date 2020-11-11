@@ -232,7 +232,7 @@ env_setup_vm(struct Env *env) {
 
   /* page table pp_ref */
   for (size_t i = NUSERPML4; i < NPMLENTRIES; i++)
-    if (kern_pml4e[i] & PTE_P)
+    if (kern_pml4e[i] & PTE_P && i != PML4(UVPT) && i != PML4(UVPD))
       pa2page(PTE_ADDR(kern_pml4e[i]))->pp_ref++;
 
   env->env_pml4e = page2kva(pi);
@@ -243,29 +243,22 @@ env_setup_vm(struct Env *env) {
           PGSIZE - NUSERPML4 * sizeof(pml4e_t));
   memset(env->env_pml4e, 0, NUSERPML4 * sizeof(pml4e_t));
 
-  int res;
+  env->env_pml4e[PML4(UVPT)] = env->env_cr3 | PTE_P | PTE_U;
 
-  /* Allocate stack for new task */
-  res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)(UXSTACKTOP - UXSTACKSIZE), UXSTACKSIZE);
-  if (res < 0) return res;
+  if ((pi = page_alloc(ALLOC_ZERO)) < 0) return -E_NO_MEM;
+  pte_t *uvpdpe = ((uintptr_t *)page2kva(pi));
+  env->env_pml4e[PML4(UVPD)] = page2pa(pi) | PTE_P | PTE_U;
+  uvpdpe[PDPE(UVPD)] = kern_cr3 | PTE_P | PTE_U;
 
-#ifdef SANITIZE_USER_SHADOW_BASE
-  void uvpt_shadow_map(struct Env *e);
-  uvpt_shadow_map(env);
-  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
-  if (res < 0) return res;
-#endif
+  if ((pi = page_alloc(ALLOC_ZERO)) < 0) return -E_NO_MEM;
+  pte_t *uvpde = ((uintptr_t *)page2kva(pi));
+  uvpdpe[PDPE(UVPDE)] = page2pa(pi) | PTE_P | PTE_U;
+  uvpde[PDX(UVPDE)] = kern_cr3 | PTE_P | PTE_U;
 
-
-
+  if ((pi = page_alloc(ALLOC_ZERO)) < 0) return -E_NO_MEM;
+  pte_t *uvpte = ((uintptr_t *)page2kva(pi));
+  uvpde[PDX(UVPML4)] = page2pa(pi) | PTE_P | PTE_U;
+  uvpte[PTX(UVPML4)] = kern_cr3 | PTE_P | PTE_U;
 
   return 0;
 }
@@ -674,6 +667,25 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
     return res;
   }
 
+  /* Allocate stack for new task */
+  res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)(UXSTACKTOP - UXSTACKSIZE), UXSTACKSIZE);
+  if (res < 0) return res;
+
+#ifdef SANITIZE_USER_SHADOW_BASE
+  void uvpt_shadow_map(struct Env *e);
+  uvpt_shadow_map(env);
+  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
+  if (res < 0) return res;
+#endif
+
   return 0;
 }
 
@@ -692,6 +704,7 @@ env_create(uint8_t *binary, size_t size, enum EnvType type) {
   struct Env *newenv;
   if (env_alloc(&newenv, 0, type) < 0)
     panic("Can't allocate new environment");
+
 
   if (load_icode(newenv, binary, size) < 0)
     panic("Can't load ELF image");
