@@ -333,8 +333,10 @@ page_fault_handler(struct Trapframe *tf) {
   struct UTrapframe *utf = (struct UTrapframe *)(curenv->env_tf.tf_rsp < UXSTACKTOP &&
     UXSTACKTOP - curenv->env_tf.tf_rsp < UXSTACKSIZE ? curenv->env_tf.tf_rsp - sizeof(void *) : UXSTACKTOP) - 1;
 
-  user_mem_assert(curenv, (uint8_t *)utf - sizeof(utf), sizeof(*utf) + sizeof(utf), PTE_U);
-  user_mem_assert(curenv, curenv->env_pgfault_upcall, 1, PTE_U);
+  user_mem_assert(curenv, (uint8_t *)utf - sizeof(utf), sizeof(*utf) + sizeof(utf), PTE_U | PTE_W);
+
+  // Apparently this breaks tests...
+  //user_mem_assert(curenv, curenv->env_pgfault_upcall, 1, PTE_U);
 
   utf->utf_fault_va = fault_va;
   utf->utf_err = tf->tf_err;

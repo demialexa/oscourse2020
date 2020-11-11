@@ -11,7 +11,6 @@ pte_t find_uvptent(uintptr_t va) {
     if (!(uvpml4e[VPML4E(va)] & PTE_P)) return 0;
     if (!(uvpde[VPDPE(va)] & PTE_P)) return 0;
     if (!(uvpd[VPD(va)] & PTE_P)) return 0;
-
     return uvpt[va / PGSIZE];
 }
 
@@ -27,7 +26,7 @@ pgfault(struct UTrapframe *utf) {
 
   // LAB 9: Your code here:
   pte_t ent = find_uvptent(utf->utf_fault_va);
-  if ((ent & (PTE_COW | PTE_P)) != (PTE_P | PTE_COW) || !(utf->utf_err & 2)) panic("Pagefault");
+  if ((ent & (PTE_COW | PTE_P)) != (PTE_P | PTE_COW) || !(utf->utf_err & 2)) panic("Pagefault 1\n");
 
   /* Allocate a new page, map it at a temporary location (PFTEMP),
    * copy the data from the old page to the new page, then move the new
@@ -39,9 +38,8 @@ pgfault(struct UTrapframe *utf) {
 
   // LAB 9: Your code here:
 
-  envid_t id = sys_getenvid();
-  int res = sys_page_alloc(id, (void *)PFTEMP, PTE_U | PTE_P | PTE_W);
-  if (res < 0) panic("Pagefault");
+  int res = sys_page_alloc(0, (void *)PFTEMP, PTE_U | PTE_P | PTE_W);
+  if (res < 0) panic("Pagefault 2\n");
 
   void *addr = (void *)ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 
@@ -53,8 +51,11 @@ pgfault(struct UTrapframe *utf) {
 #endif
   ((void *)PFTEMP, addr, PGSIZE);
 
-  res = sys_page_map(id, (void *)PFTEMP, id, addr, PTE_U | PTE_P | PTE_W);
-  if (res < 0) panic("Pagefault");
+  res = sys_page_map(0, (void *)PFTEMP, 0, addr, PTE_U | PTE_P | PTE_W);
+  if (res < 0) panic("Pagefault 3\n");
+
+  res = sys_page_unmap(0, PFTEMP);
+  if (res < 0) panic("Pagefault 3\n");
 }
 
 /* Map our virtual page pn (address pn*PGSIZE) into the target envid
@@ -74,11 +75,11 @@ duppage(envid_t envid, uintptr_t pn) {
   envid_t id = sys_getenvid();
 
   int res = sys_page_map(id, (void *)(pn * PGSIZE),
-                         envid, (void *)(pn * PGSIZE), (ent & 0xFFF) | PTE_COW);
+                         envid, (void *)(pn * PGSIZE), (ent & 0x19D) | PTE_COW);
   if (res < 0) return res;
 
   res = sys_page_map(id, (void *)(pn * PGSIZE),
-                     id, (void *)(pn * PGSIZE), (ent & 0xFFF) | PTE_COW);
+                     id, (void *)(pn * PGSIZE), (ent & 0x19D) | PTE_COW);
   return res;
 }
 
@@ -101,31 +102,41 @@ fork(void) {
   // LAB 9: Your code here.
 
   set_pgfault_handler(pgfault);
-  int err, res = sys_exofork();
-  if (res < 0) return res;
-  else if (!res) {
-    set_pgfault_handler(pgfault);
+  int err = 0, res = sys_exofork();
+  if (res <= 0) {
     return 0;
   }
 
   thisenv = &envs[ENVX(res)];
 
   for (size_t i = 0; i < UTOP; i += PGSIZE) {
+    if (!(uvpml4e[VPML4E(i)] & PTE_P)) {
+      i += PGSIZE*NPTENTRIES*NPDENTRIES*(NPDPENTRIES*1LL) - PGSIZE;
+      continue;
+    }
+    if (!(uvpde[VPDPE(i)] & PTE_P)) {
+      i += PGSIZE*NPTENTRIES*NPDENTRIES - PGSIZE;
+      continue;
+    }
+    if (!(uvpd[VPD(i)] & PTE_P)) {
+      i += PGSIZE*NPTENTRIES - PGSIZE;
+      continue;
+    }
     if (
 #ifdef SANITIZE_USER_SHADOW_BASE
-        (i >= SANITIZE_USER_SHADOW_BASE && i < SANITIZE_USER_SHADOW_BASE + SANITIZE_USER_SHADOW_SIZE) ||
-        (i >= SANITIZE_USER_EXTAR_SHADOW_BASE && i < SANITIZE_USER_EXTAR_SHADOW_BASE + SANITIZE_USER_EXTAR_SHADOW_SIZE) ||
-        (i >= SANITIZE_USER_FS_SHADOW_BASE && i < SANITIZE_USER_FS_SHADOW_BASE + SANITIZE_USER_FS_SHADOW_SIZE) ||
-        (i >= SANITIZE_USER_VPT_SHADOW_BASE && i < SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE) ||
+        (i >= ROUNDDOWN(SANITIZE_USER_SHADOW_BASE, PGSIZE) && i < ROUNDUP(SANITIZE_USER_SHADOW_BASE + SANITIZE_USER_SHADOW_SIZE, PGSIZE)) ||
+        (i >= ROUNDDOWN(SANITIZE_USER_EXTAR_SHADOW_BASE, PGSIZE) && i < ROUNDUP(SANITIZE_USER_EXTAR_SHADOW_BASE + SANITIZE_USER_EXTAR_SHADOW_SIZE, PGSIZE)) ||
+        (i >= ROUNDDOWN(SANITIZE_USER_FS_SHADOW_BASE, PGSIZE) && i < ROUNDUP(SANITIZE_USER_FS_SHADOW_BASE + SANITIZE_USER_FS_SHADOW_SIZE, PGSIZE)) ||
+        (i >= ROUNDDOWN(SANITIZE_USER_VPT_SHADOW_BASE, PGSIZE) && i < ROUNDUP(SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PGSIZE) ||
 #endif
         (i >= UXSTACKTOP - UXSTACKSIZE && i < UXSTACKTOP)) {
-      err = sys_page_alloc(res, (void *)i, PTE_U | PTE_P | PTE_W);
-      if (err < 0) goto error;
-    } else {
-      pte_t pte = find_uvptent(i);
-      if (pte & PTE_P) duppage(res, i/PGSIZE);
-    }
+      if ((err = sys_page_alloc(res, (void *)i, PTE_U | PTE_P | PTE_W)) < 0) goto error;
+    } else if (uvpt[i / PGSIZE] & PTE_P && (err = duppage(res, i/PGSIZE))) goto error;
   }
+
+  extern void _pgfault_upcall(void);
+  err = sys_env_set_pgfault_upcall(res, _pgfault_upcall);
+  if (err < 0) goto error;
 
   err = sys_env_set_status(res, ENV_RUNNABLE);
   if (err < 0) goto error;
@@ -133,7 +144,6 @@ fork(void) {
   /* Duplicating shadow addresses is insane. Make sure to skip shadow addresses in COW above. */
 
   return res;
-
 error:
   sys_env_destroy(res);
   return err;

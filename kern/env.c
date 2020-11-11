@@ -655,8 +655,6 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
   /* Allocate stack for new task */
   res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
   if (res < 0) return res;
-  res = region_alloc(env, (void *)(UXSTACKTOP - UXSTACKSIZE), UXSTACKSIZE);
-  if (res < 0) return res;
 
 #ifdef SANITIZE_USER_SHADOW_BASE
   void uvpt_shadow_map(struct Env *e);

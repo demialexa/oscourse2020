@@ -119,7 +119,7 @@ sys_env_set_status(envid_t envid, int status) {
   int res = envid2env(envid, &env, 1);
   if (res < 0) return res;
 
-  if (status != ENV_RUNNABLE || status != ENV_NOT_RUNNABLE) return -E_INVAL;
+  if (status != ENV_RUNNABLE && status != ENV_NOT_RUNNABLE) return -E_INVAL;
 
   env->env_status = status;
 
@@ -261,7 +261,7 @@ sys_page_unmap(envid_t envid, void *va) {
 
   page_remove(env->env_pml4e, va);
 
-  return -1;
+  return 0;
 }
 
 /* Try to send 'value' to the target env 'envid'.
