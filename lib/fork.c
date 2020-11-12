@@ -38,24 +38,34 @@ pgfault(struct UTrapframe *utf) {
 
   // LAB 9: Your code here:
 
-  int res = sys_page_alloc(0, (void *)PFTEMP, PTE_U | PTE_P | PTE_W);
-  if (res < 0) panic("Pagefault 2\n");
-
   void *addr = (void *)ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 
+  if (((struct PageInfo *)UPAGES)[PTE_ADDR(ent) >> PGSHIFT].pp_ref == 0) {
+    /* Only one reference, no need to copy */
+
+    int res = sys_page_map(0, addr, 0, addr, PTE_U | PTE_P | PTE_W);
+    if (res < 0) panic("Pagefault 5: %i\n", res);
+
+  } else {
+    int res = sys_page_alloc(0, (void *)PFTEMP, PTE_U | PTE_P | PTE_W);
+    if (res < 0) panic("Pagefault 6: %i\n", res);
+
+
 #ifdef SANITIZE_USER_SHADOW_BASE
-  void *__nosan_memcpy(void *dst, const void *src, size_t sz);
-  __nosan_memcpy
+    void *__nosan_memcpy(void *dst, const void *src, size_t sz);
+    __nosan_memcpy
 #else
-  memcpy
+    memcpy
 #endif
-  ((void *)PFTEMP, addr, PGSIZE);
+    ((void *)PFTEMP, addr, PGSIZE);
 
-  res = sys_page_map(0, (void *)PFTEMP, 0, addr, PTE_U | PTE_P | PTE_W);
-  if (res < 0) panic("Pagefault 3\n");
+    res = sys_page_map(0, (void *)PFTEMP, 0, addr, PTE_U | PTE_P | PTE_W);
+    if (res < 0) panic("Pagefault 3\n");
 
-  res = sys_page_unmap(0, PFTEMP);
-  if (res < 0) panic("Pagefault 3\n");
+    res = sys_page_unmap(0, PFTEMP);
+    if (res < 0) panic("Pagefault 3\n");
+  }
+
 }
 
 /* Map our virtual page pn (address pn*PGSIZE) into the target envid

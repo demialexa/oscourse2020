@@ -231,10 +231,12 @@ sys_page_map(envid_t srcenvid, void *srcva,
   pte_t *ent = pml4e_walk(env->env_pml4e, srcva, 0);
 
   if (!ent || srcva > (void *)UTOP) return -E_INVAL;
-  if (!(*ent & PTE_W) && (perm & PTE_W)) return -E_INVAL;
   if (dstva > (void *)UTOP) return -E_INVAL;
 
   struct PageInfo *pi = pa2page(PTE_ADDR(*ent));
+  if (!pi || (!(*ent & PTE_W) && (perm & PTE_W) &&
+              !(pi->pp_ref == 0 && srcva == dstva && env == dst))) return -E_INVAL;
+
   res = page_insert(dst->env_pml4e, pi, dstva, perm);
 
   return res;
