@@ -62,7 +62,8 @@ sys_env_destroy(envid_t envid) {
   int res = envid2env(envid, &env, 1);
   if (res < 0) return res;
 
-  cprintf("[%08x] exiting gracefully\n", env->env_id);
+  cprintf(env == curenv ? "[%08x] exiting gracefully\n" :
+          "[%08x] destroying %08x\n", curenv->env_id, env->env_id);
   env_destroy(env);
 
   return 0;
@@ -307,12 +308,10 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm) {
   // LAB 9: Your code here.
 
   struct Env *env;
-  int res = envid2env(envid, &env, 1);
+  int res = envid2env(envid, &env, 0);
   if (res < 0) return res;
   if (!env->env_ipc_recving) return -E_IPC_NOT_RECV;
 
-  
-  if ((perm & ~(PTE_AVAIL | PTE_W)) != (PTE_U | PTE_P)) return -E_INVAL;
   if (srcva < (void *)UTOP && env->env_ipc_dstva < (void *)UTOP) {
     res = sys_page_map(0, srcva, envid, env->env_ipc_dstva, perm);
     if (res < 0) return res;

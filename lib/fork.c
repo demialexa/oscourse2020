@@ -103,11 +103,8 @@ fork(void) {
 
   set_pgfault_handler(pgfault);
   int err = 0, res = sys_exofork();
-  if (res <= 0) {
-    return 0;
-  }
-
-  thisenv = &envs[ENVX(res)];
+  thisenv = (struct Env *)UENVS + ENVX(sys_getenvid());
+  if (res <= 0) return res;
 
   for (size_t i = 0; i < UTOP; i += PGSIZE) {
     if (!(uvpml4e[VPML4E(i)] & PTE_P)) {

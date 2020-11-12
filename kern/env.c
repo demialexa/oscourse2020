@@ -786,6 +786,9 @@ env_destroy(struct Env *env) {
     env_free(env);
     sched_yield();
   }
+  if (env->env_status != ENV_RUNNING) {
+    env_free(env);
+  }
 }
 
 void
