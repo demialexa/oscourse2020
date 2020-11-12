@@ -898,7 +898,7 @@ env_pop_tf(struct Trapframe *tf) {
  */
 void
 env_run(struct Env *env) {
-  cprintf("envrun %s: %d\n", (const char *[]){
+  if (debug) cprintf("envrun %s: %d\n", (const char *[]){
       "FREE", "DYING", "RUNNABLE", "RUNNING", "NOT_RUNNABLE" }[env->env_status], ENVX(env->env_id));
 
   // LAB 3: Your code here:
