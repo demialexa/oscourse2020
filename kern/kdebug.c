@@ -97,12 +97,12 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
 
   Dwarf_Off offset = 0, line_offset = 0;
   int res = info_by_address(&addrs, addr, &offset);
-  if (res < 0) return res;
+  if (res < 0) goto error;
 
   char *tmp_buf = NULL;
 
   res = file_name_by_info(&addrs, offset, &tmp_buf, &line_offset);
-  if (res < 0) return res;
+  if (res < 0) goto error;
   strncpy(info->rip_file, tmp_buf, sizeof(info->rip_file));
 
   /* Find line number corresponding to given address.
@@ -115,16 +115,16 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
   addr -= CALL_INSN_LEN;
 
   res = line_for_address(&addrs, addr, line_offset, &info->rip_line);
-  if (res < 0) return res;
+  if (res < 0) goto error;
 
   res = function_by_info(&addrs, addr, offset, &tmp_buf, &info->rip_fn_addr);
-  if (res < 0) return res;
+  if (res < 0) goto error;
   strncpy(info->rip_fn_name, tmp_buf, sizeof(info->rip_fn_name));
   info->rip_fn_namelen = strnlen(info->rip_fn_name, sizeof(info->rip_fn_name));
 
+error:
   lcr3(cr3);
-
-  return 0;
+  return res;
 }
 
 uintptr_t

@@ -84,7 +84,8 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   cprintf("Stack backtrace: \n");
   do {
     pte_t *pte = pml4e_walk(KADDR(cr3), rbp, 0);
-    if (!pte || !(*pte & PTE_P)) {
+    pte_t *pte2 = pml4e_walk(KADDR(cr3), rbp + 1, 0);
+    if (!pte || !pte2 || !(*pte & PTE_P) || !(*pte2 & PTE_P)) {
       cprintf("<Unreadable memory>\n");
       return 1;
     }
