@@ -189,6 +189,7 @@ region_alloc(struct Env *env, void *va, size_t len) {
       if (!pi) return -E_NO_MEM;
       int res = page_insert(env->env_pml4e, pi, va, PTE_U | PTE_W);
       if (res < 0) return res;
+
       page_decref(pi);
       va += PGSIZE;
   }
@@ -233,7 +234,7 @@ env_setup_vm(struct Env *env) {
 
   /* page table pp_ref */
   for (size_t i = NUSERPML4; i < NPMLENTRIES; i++)
-    if (kern_pml4e[i] & PTE_P && i != PML4(UVPT) && i != PML4(UVPD))
+    if (kern_pml4e[i] & PTE_P && i != PML4(UVPT))
       pa2page(PTE_ADDR(kern_pml4e[i]))->pp_ref++;
 
   env->env_pml4e = page2kva(pi);
