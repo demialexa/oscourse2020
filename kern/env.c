@@ -227,7 +227,7 @@ env_setup_vm(struct Env *env) {
   // LAB 8: Your code here:
 
   /* Allocate a page for the page directory */
-  struct PageInfo *pi = page_alloc(ALLOC_ZERO);
+  struct PageInfo *pi = page_alloc(0);
   if (!pi) return -E_NO_MEM;
 
 #define NUSERPML4 1
