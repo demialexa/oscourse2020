@@ -46,6 +46,7 @@ enum EnvType {
   ENV_TYPE_IDLE,
   ENV_TYPE_KERNEL,
   ENV_TYPE_USER,
+  ENV_TYPE_FS, // File system server
 };
 
 struct Env {

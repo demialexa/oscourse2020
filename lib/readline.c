@@ -9,7 +9,13 @@ static char buf[BUFLEN];
 
 char *
 readline(const char *prompt) {
-  if (prompt) cprintf("%s", prompt);
+  if (prompt) {
+#if JOS_KERNEL
+    cprintf("%s", prompt);
+#else
+    fprintf(1, "%s", prompt);
+#endif
+  }
 
   bool echo = iscons(0);
 
