@@ -56,7 +56,8 @@ sched_halt(void) {
   /* For debugging and testing purposes, if there are no runnable
    * environments in the system, then drop into the kernel monitor */
   for (i = 0; i < NENV; i++)
-    if (envs[i].env_status != ENV_FREE) break;
+    if (envs[i].env_status == ENV_RUNNABLE ||
+        envs[i].env_status == ENV_RUNNING) break;
   if (i == NENV) {
     cprintf("No runnable environments in the system!\n");
     for(;;) monitor(NULL);
@@ -69,6 +70,8 @@ sched_halt(void) {
   asm volatile(
       "movq $0, %%rbp\n"
       "movq %0, %%rsp\n"
+      "pushq $0\n"
+      "pushq $0\n"
       "sti\n"
       "hlt\n"
       :: "a"(cpu_ts.ts_esp0));
