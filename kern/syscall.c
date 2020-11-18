@@ -207,6 +207,9 @@ sys_page_alloc(envid_t envid, void *va, int perm) {
  *  -E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
  *      address space.
  *  -E_NO_MEM if there's no memory to allocate any necessary page tables. */
+
+static int omit_check;
+
 static int
 sys_page_map(envid_t srcenvid, void *srcva,
              envid_t dstenvid, void *dstva, int perm) {
@@ -222,11 +225,13 @@ sys_page_map(envid_t srcenvid, void *srcva,
   if ((perm & ~(PTE_AVAIL | PTE_W)) != (PTE_U | PTE_P)) return -E_INVAL;
 
   struct Env *env, *dst;
-  int res = envid2env(srcenvid, &env, 1);
+  int res = envid2env(srcenvid, &env, !omit_check);
   if (res < 0) return res;
 
-  res = envid2env(dstenvid, &dst, 1);
+  res = envid2env(dstenvid, &dst, !omit_check);
   if (res < 0) return res;
+
+  omit_check = 0;
 
   pte_t *ent = pml4e_walk(env->env_pml4e, srcva, 0);
 
@@ -315,6 +320,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm) {
   if (!env->env_ipc_recving) return -E_IPC_NOT_RECV;
 
   if (srcva < (void *)UTOP && env->env_ipc_dstva < (void *)UTOP) {
+    omit_check = 1;
     res = sys_page_map(0, srcva, envid, env->env_ipc_dstva, perm);
     if (res < 0) return res;
     env->env_ipc_perm = perm;

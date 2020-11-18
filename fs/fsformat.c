@@ -2,7 +2,7 @@
  * JOS file system format
  */
 
-// We don't actually want to define off_t!
+/* We don't actually want to define off_t! */
 #define off_t xxx_off_t
 #define bool xxx_bool
 #include <assert.h>
@@ -20,10 +20,10 @@
 #undef off_t
 #undef bool
 
-// Prevent inc/types.h, included from inc/fs.h,
-// from attempting to redefine types defined in the host's inttypes.h.
+/* Prevent inc/types.h, included from inc/fs.h,
+ * from attempting to redefine types defined in the host's inttypes.h. */
 #define JOS_INC_TYPES_H
-// Typedef the types that inc/mmu.h needs.
+/* Typedef the types that inc/mmu.h needs. */
 typedef uint32_t physaddr_t;
 typedef uint32_t off_t;
 typedef int bool;

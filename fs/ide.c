@@ -30,19 +30,19 @@ bool
 ide_probe_disk1(void) {
   int r, x;
 
-  // wait for Device 0 to be ready
+  /* wait for Device 0 to be ready */
   ide_wait_ready(0);
 
-  // switch to Device 1
+  /* switch to Device 1 */
   outb(0x1F6, 0xE0 | (1 << 4));
 
-  // check for Device 1 to be ready for a while
+  /* check for Device 1 to be ready for a while */
   for (x = 0;
        x < 1000 && ((r = inb(0x1F7)) & (IDE_BSY | IDE_DF | IDE_ERR)) != 0;
        x++)
     /* do nothing */;
 
-  // switch back to Device 0
+  /* switch back to Device 0 */
   outb(0x1F6, 0xE0 | (0 << 4));
 
   cprintf("Device 1 presence: %d\n", (x < 1000));
@@ -69,7 +69,7 @@ ide_read(uint32_t secno, void *dst, size_t nsecs) {
   outb(0x1F4, (secno >> 8) & 0xFF);
   outb(0x1F5, (secno >> 16) & 0xFF);
   outb(0x1F6, 0xE0 | ((diskno & 1) << 4) | ((secno >> 24) & 0x0F));
-  outb(0x1F7, 0x20); // CMD 0x20 means read sector
+  outb(0x1F7, 0x20); /* CMD 0x20 means read sector */
 
   for (; nsecs > 0; nsecs--, dst += SECTSIZE) {
     if ((r = ide_wait_ready(1)) < 0)
@@ -93,7 +93,7 @@ ide_write(uint32_t secno, const void *src, size_t nsecs) {
   outb(0x1F4, (secno >> 8) & 0xFF);
   outb(0x1F5, (secno >> 16) & 0xFF);
   outb(0x1F6, 0xE0 | ((diskno & 1) << 4) | ((secno >> 24) & 0x0F));
-  outb(0x1F7, 0x30); // CMD 0x30 means write sector
+  outb(0x1F7, 0x30); /* CMD 0x30 means write sector */
 
   for (; nsecs > 0; nsecs--, src += SECTSIZE) {
     if ((r = ide_wait_ready(1)) < 0)

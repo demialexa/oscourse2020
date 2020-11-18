@@ -69,8 +69,6 @@ sched_halt(void) {
   asm volatile(
       "movq $0, %%rbp\n"
       "movq %0, %%rsp\n"
-      "pushq $0\n"
-      "pushq $0\n"
       "sti\n"
       "hlt\n"
       :: "a"(cpu_ts.ts_esp0));

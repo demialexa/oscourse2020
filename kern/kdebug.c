@@ -87,7 +87,7 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
   /* Temporarily load kernel cr3 and return back once done.
    * Make sure that you fully understand why it is necessary. */
   uintptr_t cr3 = rcr3();
-  lcr3(kern_cr3);
+  if (cr3 != kern_cr3) lcr3(kern_cr3);
 
   // LAB 8: Your code here:
 
@@ -123,7 +123,7 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
   info->rip_fn_namelen = strnlen(info->rip_fn_name, sizeof(info->rip_fn_name));
 
 error:
-  lcr3(cr3);
+  if (cr3 != kern_cr3) lcr3(cr3);
   return res;
 }
 

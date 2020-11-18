@@ -55,17 +55,17 @@ fs_test(void) {
   char *blk;
   uint32_t *bits;
 
-  // back up bitmap
+  /* back up bitmap */
   if ((r = sys_page_alloc(0, (void *)PGSIZE, PTE_P | PTE_U | PTE_W)) < 0)
     panic("sys_page_alloc: %i", r);
   bits = (uint32_t *)PGSIZE;
   memmove(bits, bitmap, PGSIZE);
-  // allocate block
+  /* allocate block */
   if ((r = alloc_block()) < 0)
     panic("alloc_block: %i", r);
-  // check that block was free
+  /* check that block was free */
   assert(bits[r / 32] & (1 << (r % 32)));
-  // and is not free any more
+  /* and is not free any more */
   assert(!(bitmap[r / 32] & (1 << (r % 32))));
   cprintf("alloc_block is good\n");
   check_consistency();
