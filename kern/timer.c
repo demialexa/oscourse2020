@@ -315,8 +315,12 @@ pmtimer_cpu_frequency(void) {
   do {
     asm ("pause \t\n");
     t2 = pmtimer_get_timeval();
-    ticks_elapsed += t2 - t1;
-    t1 = t2;
+    ticks_elapsed = t2 - t1;
+    if (-ticks_elapsed <= 0xFFFFFF) {
+      ticks_elapsed += 0xFFFFFF;
+    } else if (t1 > t2) {
+      ticks_elapsed += 0xFFFFFFFF;
+    }
   } while (ticks_elapsed < ticks_in_milisecond);
 
   uint64_t tsc_elapsed = get_tsc() - tsc0;
