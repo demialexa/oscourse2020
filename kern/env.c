@@ -685,7 +685,7 @@ void
 env_create(uint8_t *binary, size_t size, enum EnvType type) {
   // LAB 3: Your code here:
 
-  if (!binary) panic("binary = NULL");
+  if (!binary) panic("binary == NULL");
 
   struct Env *newenv;
   if (env_alloc(&newenv, 0, type) < 0)
@@ -901,7 +901,7 @@ env_pop_tf(struct Trapframe *tf) {
  */
 void
 env_run(struct Env *env) {
-  if (debug) cprintf("envrun %s: %d\n", (const char *[]){
+  if (debug && env) cprintf("envrun %s: %d\n", (const char *[]){
       "FREE", "DYING", "RUNNABLE", "RUNNING", "NOT_RUNNABLE" }[env->env_status], ENVX(env->env_id));
 
   // LAB 3: Your code here:
