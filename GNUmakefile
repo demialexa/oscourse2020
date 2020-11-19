@@ -64,7 +64,7 @@ NM	:= llvm-nm
 
 EXTRA_CFLAGS	:= $(EXTRA_CFLAGS) -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member -Wno-frame-address
 
-GCC_LIB := $(shell $(CC) $(CFLAGS) -print-resource-dir)/lib/jetos/libclang_rt.builtins-x86_64.a
+GCC_LIB := $(shell $(CC) $(CFLAGS) -print-resource-dir)/lib/linux/libclang_rt.builtins-x86_64.a
 
 else
 
@@ -151,6 +151,7 @@ CFLAGS += -Wall -Wformat=2 -Wno-unused-function -Werror -g -gpubnames
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 CFLAGS += -DUPAGES_SIZE=$(UPAGES_SIZE)  -DFBUFF_SIZE=$(FBUFF_SIZE)
 CFLAGS += $(EXTRA_CFLAGS)
+CFLAGS += -mno-mmx -mno-sse -mno-sse2
 
 
 KERN_SAN_CFLAGS :=
