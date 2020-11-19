@@ -416,7 +416,7 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
         if (ELF64_ST_BIND(syms[j].st_info) == STB_GLOBAL &&
             ELF64_ST_TYPE(syms[j].st_info) == STT_OBJECT &&
             syms[j].st_other == STV_DEFAULT &&
-            syms[j].st_size == sizeof(void *)) {
+            syms[j].st_size == sizeof(void (*)())) {
 
           const char *name = strings + syms[j].st_name;
 
@@ -435,7 +435,8 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
           uintptr_t addr = find_function(name);
           if (addr) {
             cprintf("Bind function '%s' to %p\n", name, (void *)addr);
-            memcpy((void *)syms[j].st_value, &addr, sizeof(void *));
+            void (*tmp)() = (void (*)())addr;
+            memcpy((void (*)())syms[j].st_value, &tmp, sizeof(void (*)()));
           }
         }
       }
