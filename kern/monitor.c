@@ -114,7 +114,7 @@ int mon_stop(int argc, char **argv, struct Trapframe *tf) {
 int mon_frequency(int argc, char **argv, struct Trapframe *tf) {
   char *name = argc == 1 ? "hpet0" : argv[1];
   timer_cpu_frequency(name);
-  cprintf("%lli MGz\n", cpu_freq / Mega);
+  cprintf("%lld MGz\n", cpu_freq / Mega);
   return 0;
 }
 

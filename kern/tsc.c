@@ -223,8 +223,7 @@ void
 timer_start(const char *name) {
   timer_started = 1;
   timer = read_tsc();
-  if (!cpu_freq)
-    timer_cpu_frequency(name);
+  timer_cpu_frequency(name);
 }
 
 void
