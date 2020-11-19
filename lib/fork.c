@@ -8,10 +8,10 @@
 #define PTE_COW 0x800
 
 pte_t find_uvptent(uintptr_t va) {
-    if (!(uvpml4e[VPML4E(va)] & PTE_P)) return 0;
-    if (!(uvpde[VPDPE(va)] & PTE_P)) return 0;
-    if (!(uvpd[VPD(va)] & PTE_P)) return 0;
-    return uvpt[va / PGSIZE];
+  if (!(uvpml4e[VPML4E(va)] & PTE_P)) return 0;
+  if (!(uvpde[VPDPE(va)] & PTE_P)) return 0;
+  if (!(uvpd[VPD(va)] & PTE_P)) return 0;
+  return uvpt[va / PGSIZE];
 }
 
 /* Custom page fault handler - if faulting page is copy-on-write,
@@ -85,11 +85,11 @@ duppage(envid_t envid, uintptr_t pn) {
   envid_t id = sys_getenvid();
 
   int res = sys_page_map(id, (void *)(pn * PGSIZE),
-                         envid, (void *)(pn * PGSIZE), (ent & 0x19D) | PTE_COW);
+                         envid, (void *)(pn * PGSIZE), (PTE_ADDR(ent) & ~(PTE_PS | PTE_A | PTE_D)) | PTE_COW);
   if (res < 0) return res;
 
   res = sys_page_map(id, (void *)(pn * PGSIZE),
-                     id, (void *)(pn * PGSIZE), (ent & 0x19D) | PTE_COW);
+                     id, (void *)(pn * PGSIZE), (PTE_ADDR(ent) & ~(PTE_PS | PTE_A | PTE_D)) | PTE_COW);
   return res;
 }
 
