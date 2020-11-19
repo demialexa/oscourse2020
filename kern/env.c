@@ -589,9 +589,7 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
     return -E_INVALID_EXE;
   }
 
-  uintptr_t cr3 = rcr3();
-  lcr3(env->env_cr3);
-
+  
   uintptr_t min_addr = UTOP, max_addr = 0;
   for (size_t i = 0; i < elf->e_phnum; i++) {
     if (ph[i].p_type == ELF_PROG_LOAD) {
@@ -606,14 +604,12 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
       size_t filesz = MIN(ph[i].p_filesz, memsz);
 
       if ((uint8_t *)src + filesz > binary + size) {
-        lcr3(cr3);
         cprintf("Section contents exceeds file size: %lu > %lu\n",
                 (unsigned long)((uint8_t *)(src + filesz) - binary), size);
         return -E_INVALID_EXE;
       }
 
       if ((uintptr_t)dst + memsz > UTOP) {
-        lcr3(cr3);
         cprintf("Section contents exceeds user memory: %p > %p\n", (dst + memsz), (void *)UTOP);
         return -E_INVALID_EXE;
       }
@@ -622,10 +618,43 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
           (unsigned long)filesz, (unsigned long)memsz, dst);
 
       if (region_alloc(env, dst, memsz)) {
-        lcr3(cr3);
-        cprintf("Out of memory");
+        cprintf("Out of memory\n");
         return -E_NO_MEM;
       }
+    }
+  }
+
+  /* Allocate stack for new task */
+  int res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
+  if (res < 0) return res;
+
+#ifdef SANITIZE_USER_SHADOW_BASE
+  void uvpt_shadow_map(struct Env *e);
+  uvpt_shadow_map(env);
+  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
+  if (res < 0) return res;
+#endif
+
+
+  uintptr_t cr3 = rcr3();
+  lcr3(env->env_cr3);
+
+  for (size_t i = 0; i < elf->e_phnum; i++) {
+    if (ph[i].p_type == ELF_PROG_LOAD) {
+      min_addr = MIN(min_addr, ph[i].p_va);
+      max_addr = MAX(max_addr, ph[i].p_va + ph[i].p_memsz);
+
+      void *src = binary + ph[i].p_offset;
+      void *dst = (void *)ph[i].p_va;
+
+      size_t memsz  = ph[i].p_memsz;
+      size_t filesz = MIN(ph[i].p_filesz, memsz);
 
       memset(dst + filesz, 0, memsz - filesz);
       memcpy(dst, src, filesz);
@@ -649,28 +678,11 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
   env->env_tf.tf_rip = elf->e_entry;
   cprintf("Program entry point %lx\n", (unsigned long)elf->e_entry);
 
-  int res = bind_functions(env, binary, size, min_addr, max_addr);
+  res = bind_functions(env, binary, size, min_addr, max_addr);
   if (res < 0) {
     cprintf("Failed to bind functions: %i\n", res);
     return res;
   }
-
-  /* Allocate stack for new task */
-  res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
-  if (res < 0) return res;
-
-#ifdef SANITIZE_USER_SHADOW_BASE
-  void uvpt_shadow_map(struct Env *e);
-  uvpt_shadow_map(env);
-  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
-  if (res < 0) return res;
-#endif
 
   return 0;
 }
