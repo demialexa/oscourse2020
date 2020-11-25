@@ -309,8 +309,6 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
 static int
 copy_shared_pages(envid_t child) {
   // LAB 11: Your code here:
-  int err;
-
   for (size_t i = 0; i < UTOP; i += PGSIZE) {
     if (!(uvpml4e[VPML4E(i)] & PTE_P)) {
       i += PGSIZE*NPTENTRIES*NPDENTRIES*(NPDPENTRIES*1LL) - PGSIZE;
@@ -324,8 +322,8 @@ copy_shared_pages(envid_t child) {
       i += PGSIZE*NPTENTRIES - PGSIZE;
       continue;
     }
-    if ((uvpt[i / PGSIZE] & (PTE_P | PTE_SHARE)) == (PTE_P | PTE_SHARE)) {
-      err = sys_page_map(0, (void *)i, child, (void *)i, uvpt[i / PGSIZE] & PTE_SYSCALL);
+    if ((uvpt[PGNUM(i)] & (PTE_P | PTE_SHARE)) == (PTE_P | PTE_SHARE)) {
+      int err = sys_page_map(0, (void *)i, child, (void *)i, uvpt[PGNUM(i)] & PTE_SYSCALL);
       if (err < 0) return err;
     }
   }
