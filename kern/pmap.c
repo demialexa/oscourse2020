@@ -634,7 +634,7 @@ page_remove(pml4e_t *pml4e, void *va) {
   pte_t *ent = pml4e_walk(pml4e, va, 0);
   if (!ent) return;
 
-  page_decref(pa2page(PTE_ADDR(*ent)));
+  if (PTE_ADDR(*ent)) page_decref(pa2page(PTE_ADDR(*ent)));
   *ent = 0;
 
   tlb_invalidate(pml4e, va);
