@@ -27,7 +27,8 @@ pgfault(struct UTrapframe *utf) {
 
   // LAB 9: Your code here:
   pte_t ent = find_uvptent(utf->utf_fault_va);
-  if ((ent & (PTE_COW | PTE_P)) != (PTE_P | PTE_COW) || !(utf->utf_err & 2)) panic("Pagefault 1\n");
+  if ((ent & (PTE_COW | PTE_P)) != (PTE_P | PTE_COW) || !(utf->utf_err & FEC_WR))
+    panic("User pagefault at %p\n", (void *)utf->utf_fault_va);
 
   /* Allocate a new page, map it at a temporary location (PFTEMP),
    * copy the data from the old page to the new page, then move the new
@@ -83,13 +84,11 @@ duppage(envid_t envid, uintptr_t pn) {
   // LAB 9: Your code here.
 
   pte_t ent = uvpt[pn];
-  envid_t id = sys_getenvid();
-  int res = sys_page_map(id, (void *)(pn * PGSIZE),
-                         envid, (void *)(pn * PGSIZE), (ent & PTE_OK) | PTE_COW);
+  int res = sys_page_map(0, (void *)(pn * PGSIZE), envid, (void *)(pn * PGSIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
   if (res < 0) return res;
 
-  res = sys_page_map(id, (void *)(pn * PGSIZE),
-                     id, (void *)(pn * PGSIZE), (ent & PTE_OK) | PTE_COW);
+  if (ent & PTE_W)
+      res = sys_page_map(0, (void *)(pn * PGSIZE), 0, (void *)(pn * PGSIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
   return res;
 }
 
@@ -137,8 +136,15 @@ fork(void) {
 #undef _IN
 #endif
         (i >= UXSTACKTOP - UXSTACKSIZE && i < UXSTACKTOP)) {
-      if ((err = sys_page_alloc(res, (void *)i, PTE_U | PTE_P | PTE_W)) < 0) goto error;
-    } else if (uvpt[i / PGSIZE] & PTE_P && (err = duppage(res, i/PGSIZE))) goto error;
+      err = sys_page_alloc(res, (void *)i, PTE_U | PTE_P | PTE_W);
+    } else if (uvpt[PGNUM(i)] & PTE_P) {
+      if (uvpt[PGNUM(i)] & PTE_SHARE) {
+        err = sys_page_map(0, (void *)i, res, (void *)i, uvpt[PGNUM(i)] & PTE_SYSCALL);
+      } else {
+        err = duppage(res, PGNUM(i));
+      }
+    }
+    if (err < 0) goto error;
   }
 
   extern void _pgfault_upcall(void);
