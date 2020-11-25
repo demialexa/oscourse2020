@@ -308,6 +308,27 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
 /* Copy the mappings for shared pages into the child address space. */
 static int
 copy_shared_pages(envid_t child) {
-  // LAB 11: Your code here.
+  // LAB 11: Your code here:
+  int err;
+
+  for (size_t i = 0; i < UTOP; i += PGSIZE) {
+    if (!(uvpml4e[VPML4E(i)] & PTE_P)) {
+      i += PGSIZE*NPTENTRIES*NPDENTRIES*(NPDPENTRIES*1LL) - PGSIZE;
+      continue;
+    }
+    if (!(uvpde[VPDPE(i)] & PTE_P)) {
+      i += PGSIZE*NPTENTRIES*NPDENTRIES - PGSIZE;
+      continue;
+    }
+    if (!(uvpd[VPD(i)] & PTE_P)) {
+      i += PGSIZE*NPTENTRIES - PGSIZE;
+      continue;
+    }
+    if ((uvpt[i / PGSIZE] & (PTE_P | PTE_SHARE)) == (PTE_P | PTE_SHARE)) {
+      err = sys_page_map(0, (void *)i, child, (void *)i, uvpt[i / PGSIZE] & PTE_SYSCALL);
+      if (err < 0) return err;
+    }
+  }
+
   return 0;
 }
