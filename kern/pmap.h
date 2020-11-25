@@ -8,6 +8,7 @@
 
 #include <inc/memlayout.h>
 #include <inc/assert.h>
+struct Env;
 
 extern char bootstacktop[], bootstack[];
 
@@ -78,6 +79,9 @@ void *mmio_remap_last_region(physaddr_t pa, void *addr, size_t oldsize, size_t n
 
 static void check_page_free_list(bool only_low_memory);
 // LAB 7 done
+
+int user_mem_check(struct Env *env, const void *va, size_t len, int perm);
+void user_mem_assert(struct Env *env, const void *va, size_t len, int perm);
 
 static inline physaddr_t
 page2pa(struct PageInfo *pp) {
