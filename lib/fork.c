@@ -6,6 +6,7 @@
 /* PTE_COW marks copy-on-write page table entries.
  * It is one of the bits explicitly allocated to user processes (PTE_AVAIL). */
 #define PTE_COW 0x800
+#define PTE_OK (PTE_P | PTE_U | PTE_PWT | PTE_PCD | PTE_G | PTE_PS)
 
 pte_t find_uvptent(uintptr_t va) {
   if (!(uvpml4e[VPML4E(va)] & PTE_P)) return 0;
@@ -83,13 +84,12 @@ duppage(envid_t envid, uintptr_t pn) {
 
   pte_t ent = uvpt[pn];
   envid_t id = sys_getenvid();
-
   int res = sys_page_map(id, (void *)(pn * PGSIZE),
-                         envid, (void *)(pn * PGSIZE), (PTE_ADDR(ent) & ~(PTE_PS | PTE_A | PTE_D)) | PTE_COW);
+                         envid, (void *)(pn * PGSIZE), (ent & PTE_OK) | PTE_COW);
   if (res < 0) return res;
 
   res = sys_page_map(id, (void *)(pn * PGSIZE),
-                     id, (void *)(pn * PGSIZE), (PTE_ADDR(ent) & ~(PTE_PS | PTE_A | PTE_D)) | PTE_COW);
+                     id, (void *)(pn * PGSIZE), (ent & PTE_OK) | PTE_COW);
   return res;
 }
 
