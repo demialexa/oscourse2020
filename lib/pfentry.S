@@ -69,8 +69,7 @@ _pgfault_upcall:
     # Restore the trap-time registers.  After you do this, you
     # can no longer modify any general-purpose registers.
 
-    popq %r15
-    popq %r15
+    add $16, %rsp
     popq %r15
     popq %r14
     popq %r13
@@ -98,11 +97,11 @@ _pgfault_upcall:
     # no longer use arithmetic operations or anything else that
     # modifies rflags.
 
-    pushq 8(%rsp)
+    addq $8, %rsp
     popfq
     
     # Switch back to the adjusted trap-time stack.
-    movq 16(%rsp), %rsp
+    popq %rsp
 
     # Return to re-execute the instruction that faulted.
     ret
