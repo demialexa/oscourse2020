@@ -84,6 +84,8 @@ trap_init(void) {
   extern void trap_mchk(void);
   extern void trap_simderr(void);
   extern void trap_syscall(void);
+  extern void serial_thdlr(void);
+  extern void kbd_thdlr(void);
 
   SETGATE(idt[T_DIVIDE], 0, GD_KT, (uintptr_t)(&trap_divide), 0)
   SETGATE(idt[T_DEBUG], 0, GD_KT, (uintptr_t)(&trap_debig), 0)
@@ -104,6 +106,8 @@ trap_init(void) {
   SETGATE(idt[T_MCHK], 0, GD_KT, (uintptr_t)(&trap_mchk), 0)
   SETGATE(idt[T_SIMDERR], 0, GD_KT, (uintptr_t)(&trap_simderr), 0)
   SETGATE(idt[T_SYSCALL], 0, GD_KT, (uintptr_t)(&trap_syscall), 3)
+  SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, (uintptr_t)(&kbd_thdlr), 0);
+  SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, (uintptr_t)(&serial_thdlr), 0);
 
   /* Per-CPU setup */
   trap_init_percpu();
@@ -226,6 +230,12 @@ trap_dispatch(struct Trapframe *tf) {
     return;
   // Handle keyboard and serial interrupts.
   // LAB 11: Your code here:
+  case IRQ_OFFSET + IRQ_KBD:
+    kbd_intr();
+    return;
+  case IRQ_OFFSET + IRQ_SERIAL:
+    serial_intr();
+    return;
   default:
     print_trapframe(tf);
     if (!(tf->tf_cs & 0x3))
@@ -296,7 +306,7 @@ page_fault_handler(struct Trapframe *tf) {
   /* Handle kernel-mode page faults. */
   // LAB 8: Your code here.
 
-  if (!(tf->tf_err & 4))
+  if (!(tf->tf_err & FEC_U))
     panic("Kernel pagefault");
 
   /* We've already handled kernel-mode exceptions, so if we get here,
