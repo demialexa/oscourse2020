@@ -590,6 +590,22 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
     return -E_INVALID_EXE;
   }
 
+  /* Allocate stack for new task */
+  int res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
+  if (res < 0) return res;
+
+#ifdef SANITIZE_USER_SHADOW_BASE
+  void uvpt_shadow_map(struct Env *e);
+  uvpt_shadow_map(env);
+  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
+  if (res < 0) return res;
+  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
+  if (res < 0) return res;
+#endif
   
   uintptr_t min_addr = UTOP, max_addr = 0;
   for (size_t i = 0; i < elf->e_phnum; i++) {
@@ -625,32 +641,22 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
     }
   }
 
-  /* Allocate stack for new task */
-  int res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
-  if (res < 0) return res;
+  if (max_addr <= min_addr || max_addr >= UTOP) {
+    cprintf("Invalid memory mappings\n");
+    return -E_INVALID_EXE;
+  }
 
-#ifdef SANITIZE_USER_SHADOW_BASE
-  void uvpt_shadow_map(struct Env *e);
-  uvpt_shadow_map(env);
-  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
-  if (res < 0) return res;
-#endif
-
+  if (elf->e_entry >= max_addr || elf->e_entry < min_addr) {
+    cprintf("Program entry point %lu is outside proram data\n",
+            (unsigned long)elf->e_entry);
+    return -E_INVALID_EXE;
+  }
 
   uintptr_t cr3 = rcr3();
   lcr3(env->env_cr3);
 
   for (size_t i = 0; i < elf->e_phnum; i++) {
     if (ph[i].p_type == ELF_PROG_LOAD) {
-      min_addr = MIN(min_addr, ph[i].p_va);
-      max_addr = MAX(max_addr, ph[i].p_va + ph[i].p_memsz);
-
       void *src = binary + ph[i].p_offset;
       void *dst = (void *)ph[i].p_va;
 
@@ -663,17 +669,6 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
   }
 
   lcr3(cr3);
-
-  if (max_addr <= min_addr || max_addr >= UTOP) {
-    cprintf("Invalid memory mappings\n");
-    return -E_INVALID_EXE;
-  }
-
-  if (elf->e_entry >= max_addr || elf->e_entry < min_addr) {
-    cprintf("Program entry point %lu is outside proram data\n",
-            (unsigned long)elf->e_entry);
-    return -E_INVALID_EXE;
-  }
 
   /* Set progrma entry point */
   env->env_tf.tf_rip = elf->e_entry;
