@@ -22,9 +22,9 @@
 #include <inc/args.h>
 
 #ifdef SANITIZE_USER_SHADOW_BASE
-// asan unpoison routine used for whitelisting regions.
+/* asan unpoison routine used for whitelisting regions. */
 void platform_asan_unpoison(void *addr, uint32_t size);
-// non-sanitized memcpy and memset allow us to access "invalid" areas for extra poisoning.
+/* non-sanitized memcpy and memset allow us to access "invalid" areas for extra poisoning. */
 void *__nosan_memset(void *, int, size_t);
 void *__nosan_memcpy(void *dst, const void *src, size_t sz);
 #endif
@@ -66,7 +66,7 @@ int sys_page_unmap(envid_t env, void *pg);
 int sys_ipc_try_send(envid_t to_env, uint64_t value, void *pg, int perm);
 int sys_ipc_recv(void *rcv_pg);
 
-// This must be inlined.  Exercise for reader: why?
+/* This must be inlined.  Exercise for reader: why? */
 static __inline envid_t __attribute__((always_inline))
 sys_exofork(void) {
   envid_t ret;
@@ -77,17 +77,17 @@ sys_exofork(void) {
   return ret;
 }
 
-// ipc.c
+/* ipc.c */
 void ipc_send(envid_t to_env, uint32_t value, void *pg, int perm);
 int32_t ipc_recv(envid_t *from_env_store, void *pg, int *perm_store);
 envid_t ipc_find_env(enum EnvType type);
 
-// fork.c
+/* fork.c */
 #define PTE_SHARE 0x400
 envid_t fork(void);
-envid_t sfork(void); // Challenge!
+envid_t sfork(void); /* Challenge! */
 
-// fd.c
+/* fd.c */
 int close(int fd);
 ssize_t read(int fd, void *buf, size_t nbytes);
 ssize_t write(int fd, const void *buf, size_t nbytes);
@@ -98,30 +98,30 @@ int dup(int oldfd, int newfd);
 int fstat(int fd, struct Stat *statbuf);
 int stat(const char *path, struct Stat *statbuf);
 
-// file.c
+/* file.c */
 int open(const char *path, int mode);
 int ftruncate(int fd, off_t size);
 int remove(const char *path);
 int sync(void);
 
-// pageref.c
+/* pageref.c */
 int pageref(void *addr);
 
-// spawn.c
+/* spawn.c */
 envid_t spawn(const char *program, const char **argv);
 envid_t spawnl(const char *program, const char *arg0, ...);
 
-// console.c
+/* console.c */
 void cputchar(int c);
 int getchar(void);
 int iscons(int fd);
 int opencons(void);
 
-// pipe.c
+/* pipe.c */
 int pipe(int pipefds[2]);
 int pipeisclosed(int pipefd);
 
-// wait.c
+/* wait.c */
 void wait(envid_t env);
 
 /* File open modes */
@@ -140,4 +140,4 @@ extern void (*volatile sys_exit)(void);
 extern void (*volatile sys_yield)(void);
 #endif
 
-#endif // !JOS_INC_LIB_H
+#endif /* !JOS_INC_LIB_H */
