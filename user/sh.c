@@ -52,7 +52,7 @@ again:
 
         // LAB 11: Your code here.
         fd = open(t, O_RDONLY);
-        if (fd < 0 && dup(fd, 0) < 0) {
+        if (fd < 0 || dup(fd, 0) < 0) {
             cprintf("error openning file '%s'\n", t);
             exit();
         }
