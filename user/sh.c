@@ -51,8 +51,13 @@ again:
         // then close the original 'fd'.
 
         // LAB 11: Your code here.
+        fd = open(t, O_RDONLY);
+        if (fd < 0 && dup(fd, 0) < 0) {
+            cprintf("error openning file '%s'\n", t);
+            exit();
+        }
+        close(fd);
         break;
-
       case '>': // Output redirection
         // Grab the filename from the argument list
         if (gettoken(0, &t) != 'w') {
