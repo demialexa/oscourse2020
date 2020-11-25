@@ -466,8 +466,8 @@ void
 page_decref(struct PageInfo *pp) {
   // LAB 6: Fill this function in
 
-  if (pp->pp_ref == REFC_FREE || pp->pp_link)
-    panic("page_decref: Page cannot be freed!\n");
+  if (pp->pp_ref == REFC_FREE)
+      panic("page_decref: Page cannot be freed!\n");
 
   if (--pp->pp_ref == REFC_FREE) {
     pp->pp_link = page_free_list;
