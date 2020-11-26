@@ -165,7 +165,7 @@ memmove(void *dst, const void *src, size_t n) {
         }
         /* Some versions of GCC rely on DF being clear */
         asm volatile("cld" ::: "cc");
-        } else {
+    } else {
         if (!(((intptr_t)s & 7) | ((intptr_t)d & 7) | (n & 7))) {
           asm volatile("cld; rep movsq\n"
                        ::"D"(d), "S"(s), "c"(n / 8)
