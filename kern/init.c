@@ -134,6 +134,10 @@ i386_init(void) {
     (*ctor)();
     ctor++;
   }
+  // LAB 8?
+  pic_init();
+  rtc_init();
+  // LAB 8 end
 
 #ifdef SANITIZE_SHADOW_BASE
   kasan_mem_init();
@@ -172,11 +176,9 @@ i386_init(void) {
   ENV_CREATE_KERNEL_TYPE(prog_test1);
   ENV_CREATE_KERNEL_TYPE(prog_test2);
   ENV_CREATE_KERNEL_TYPE(prog_test3);
-#if 0
   ENV_CREATE_KERNEL_TYPE(prog_test4);
   ENV_CREATE_KERNEL_TYPE(prog_test5);
   ENV_CREATE_KERNEL_TYPE(prog_test6);
-#else
 #if defined(TEST)
   // Don't touch -- used by grading script!
   ENV_CREATE(TEST, ENV_TYPE_USER);
@@ -184,7 +186,6 @@ i386_init(void) {
   // Touch all you want.
   ENV_CREATE(user_hello, ENV_TYPE_USER);
 #endif // TEST*
-#endif
 #endif
 
   // Schedule and run the first user environment!
