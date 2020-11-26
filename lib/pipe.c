@@ -15,7 +15,7 @@ struct Dev devpipe = {
 };
 
 /* NOTE: Make it small to provoke races */
-#define PIPEBUFSIZ 512 
+#define PIPEBUFSIZ 32
 
 struct Pipe {
     off_t p_rpos;              /* read position */
