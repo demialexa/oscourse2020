@@ -20,20 +20,20 @@ void (*_pgfault_handler)(struct UTrapframe *utf);
  * _pgfault_upcall routine when a page fault occurs. */
 void
 set_pgfault_handler(void (*handler)(struct UTrapframe *utf)) {
-  int res;
-  envid_t envid = sys_getenvid();
-  if (!_pgfault_handler) {
-    /* First time through! */
-    // LAB 9: Your code here.
-    res = sys_page_alloc(envid, (void*)(UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W);
-    if (res) goto end;
-  }
+    int res;
+    envid_t envid = sys_getenvid();
+    if (!_pgfault_handler) {
+        /* First time through! */
+        // LAB 9: Your code here:
+        res = sys_page_alloc(envid, (void*)(UXSTACKTOP - PGSIZE), PTE_UWP);
+        if (res) goto end;
+      }
 
-  /* Save handler pointer for assembly to call. */
-  _pgfault_handler = handler;
+    /* Save handler pointer for assembly to call. */
+    _pgfault_handler = handler;
 
-  res = sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+    res = sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
 
 end:
-  if (res < 0) panic("set_pgfault_handler: %i", res);
+    if (res < 0) panic("set_pgfault_handler: %i", res);
 }

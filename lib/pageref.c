@@ -1,13 +1,16 @@
 #include <inc/lib.h>
 
+pte_t
+get_uvpt_entry(void *va) {
+    if (!(uvpml4e[VPML4E(va)] & PTE_P)) return 0;
+    if (!(uvpde[VPDPE(va)] & PTE_P)) return 0;
+    if (!(uvpd[VPD(va)] & PTE_P)) return 0;
+
+    return uvpt[PGNUM(va)];
+}
+
 int
 pageref(void *v) {
-  pte_t pte;
-
-  if (!(uvpml4e[PML4(v)] & PTE_P) || !(uvpde[VPDPE(v)] & PTE_P) || !(uvpd[VPD(v)] & PTE_P) || !(uvpt[PGNUM(v)] & PTE_P))
-    return 0;
-  pte = uvpt[PGNUM(v)];
-  if (!(pte & PTE_P))
-    return 0;
-  return pages[PPN(pte)].pp_ref + 1;
+    pte_t pte = get_uvpt_entry(v);
+    return (pte & PTE_P) ? pages[PPN(pte)].pp_ref + 1 : 0;
 }

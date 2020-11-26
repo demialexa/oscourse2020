@@ -1,74 +1,72 @@
 #include <inc/lib.h>
 
-// Collect up to 256 characters into a buffer
-// and perform ONE system call to print all of them,
-// in order to make the lines output to the console atomic
-// and prevent interrupts from causing context switches
-// in the middle of a console output line and such.
+#define PRINTBUFSZ 256
+
+/* Collect up to PRINTBUFSZ characters into a buffer
+ * and perform ONE system call to print all of them,
+ * in order to make the lines output to the console atomic
+ * and prevent interrupts from causing context switches
+ * in the middle of a console output line and such. */
 struct printbuf {
-  int fd;         // file descriptor
-  int idx;        // current buffer index
-  ssize_t result; // accumulated results from write
-  int error;      // first error that occurred
-  char buf[256];
+    int fd;         /* File descriptor */
+    int offset;     /* Current buffer index */
+    ssize_t result; /* Accumulated results from write */
+    int error;      /* First error that occurred */
+    char buf[PRINTBUFSZ];
 };
 
 static void
-writebuf(struct printbuf *b) {
-  if (b->error > 0) {
-    ssize_t result = write(b->fd, b->buf, b->idx);
-    if (result > 0)
-      b->result += result;
-    if (result != b->idx) // error, or wrote less than supplied
-      b->error = (result < 0 ? result : 0);
-  }
+writebuf(struct printbuf *state) {
+    if (state->error > 0) {
+        ssize_t result = write(state->fd, state->buf, state->offset);
+        if (result > 0) state->result += result;
+
+        /* Error, or wrote less than supplied */
+        if (result != state->offset)
+            state->error = MIN(0, result);
+    }
 }
 
 static void
-putch(int ch, void *thunk) {
-  struct printbuf *b = (struct printbuf *)thunk;
-  b->buf[b->idx++]   = ch;
-  if (b->idx == 256) {
-    writebuf(b);
-    b->idx = 0;
-  }
+putch(int ch, void *arg) {
+    struct printbuf *state = (struct printbuf *)arg;
+    state->buf[state->offset++] = ch;
+    if (state->offset == PRINTBUFSZ) {
+        writebuf(state);
+        state->offset = 0;
+    }
 }
 
 int
 vfprintf(int fd, const char *fmt, va_list ap) {
-  struct printbuf b;
+    struct printbuf state;
+    state.fd = fd;
+    state.offset = 0;
+    state.result = 0;
+    state.error = 1;
 
-  b.fd     = fd;
-  b.idx    = 0;
-  b.result = 0;
-  b.error  = 1;
-  vprintfmt(putch, &b, fmt, ap);
-  if (b.idx > 0)
-    writebuf(&b);
+    vprintfmt(putch, &state, fmt, ap);
+    if (state.offset > 0) writebuf(&state);
 
-  return (b.result ? b.result : b.error);
+    return (state.result ? state.result : state.error);
 }
 
 int
 fprintf(int fd, const char *fmt, ...) {
-  va_list ap;
-  int cnt;
+    va_list ap;
+    va_start(ap, fmt);
+    int res = vfprintf(fd, fmt, ap);
+    va_end(ap);
 
-  va_start(ap, fmt);
-  cnt = vfprintf(fd, fmt, ap);
-  va_end(ap);
-
-  return cnt;
+    return res;
 }
 
 int
 printf(const char *fmt, ...) {
   va_list ap;
-  int cnt;
-
   va_start(ap, fmt);
-  cnt = vfprintf(1, fmt, ap);
+  int res = vfprintf(1, fmt, ap);
   va_end(ap);
 
-  return cnt;
+  return res;
 }

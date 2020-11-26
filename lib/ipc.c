@@ -21,12 +21,22 @@
  *   a perfectly valid place to map a page.) */
 int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store) {
-  // LAB 9: Your code here:
+    // LAB 9: Your code here:
 
-  int res = sys_ipc_recv(pg ? pg : (void *)(UTOP + PGSIZE));
-  if (from_env_store) *from_env_store = res < 0 ? 0 : thisenv->env_ipc_from;
-  if (perm_store) *perm_store = res < 0 ? 0 : thisenv->env_ipc_perm;
-  return res < 0 ? res : thisenv->env_ipc_value;
+    int res = sys_ipc_recv(pg ? pg : (void *)(UTOP + PGSIZE));
+    if (res < 0) {
+        if (from_env_store)
+            *from_env_store = 0;
+        if (perm_store)
+            *perm_store = 0;
+        return res;
+    } else {
+        if (from_env_store)
+            *from_env_store = thisenv->env_ipc_from;
+        if (perm_store)
+            *perm_store = thisenv->env_ipc_perm;
+        return thisenv->env_ipc_value;
+    }
 }
 
 /* Send 'val' (and 'pg' with 'perm', if 'pg' is nonnull) to 'toenv'.
@@ -39,14 +49,15 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store) {
  *   as meaning "no page".  (Zero is not the right value.) */
 void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm) {
-  // LAB 9: Your code here.
-  int res;
-  do {
-    res = sys_ipc_try_send(to_env, val, pg ? pg : (void *)(UTOP + PGSIZE), perm);
-    if (res == -E_IPC_NOT_RECV) sys_yield();
-  } while (res == -E_IPC_NOT_RECV);
+  // LAB 9: Your code here:
 
-  if (res < 0) panic("IPC error: %i\n", res);
+    int res;
+    do {
+        res = sys_ipc_try_send(to_env, val, pg ? pg : (void *)-1U, perm);
+        if (res == -E_IPC_NOT_RECV) sys_yield();
+    } while (res == -E_IPC_NOT_RECV);
+
+    if (res < 0) panic("IPC error: %i\n", res);
 }
 
 /* Find the first environment of the given type.  We'll use this to
@@ -54,9 +65,8 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm) {
  * Returns 0 if no such environment exists. */
 envid_t
 ipc_find_env(enum EnvType type) {
-  int i;
-  for (i = 0; i < NENV; i++)
-    if (envs[i].env_type == type)
-      return envs[i].env_id;
-  return 0;
+    for (size_t i = 0; i < NENV; i++)
+        if (envs[i].env_type == type)
+          return envs[i].env_id;
+    return 0;
 }

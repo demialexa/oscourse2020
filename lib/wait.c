@@ -1,12 +1,14 @@
 #include <inc/lib.h>
 
-// Waits until 'envid' exits.
+/* Waits until 'envid' exits. */
 void
 wait(envid_t envid) {
-  const volatile struct Env *e;
+    assert(envid != 0);
 
-  assert(envid != 0);
-  e = &envs[ENVX(envid)];
-  while (e->env_id == envid && e->env_status != ENV_FREE)
-    sys_yield();
+    const volatile struct Env *env = &envs[ENVX(envid)];
+
+    while (env->env_id == envid &&
+           env->env_status != ENV_FREE) {
+        sys_yield();
+    }
 }

@@ -2,6 +2,7 @@
 #include <inc/memlayout.h>
 
 .data
+
 # Define the global symbols 'envs', 'pages', 'uvpt', 'uvpd', 'uvpde' and 'uvpml4e'
 # so that they can be used in C as if they were ordinary global arrays
 .globl envs
@@ -22,24 +23,24 @@
 .text
 .globl _start
 _start:
-  # See if we were started with arguments on the stack
+    # See if we were started with arguments on the stack
 
 #ifndef CONFIG_KSPACE
-  movabs $USTACKTOP, %rax
-  cmpq %rax, %rsp
-  jne args_exist
+    movabs $USTACKTOP, %rax
+    cmpq %rax, %rsp
+    jne args_exist
 #endif
 
-  # If not, push dummy argc/argv arguments.
-  # This happens when we are loaded by the kernel,
-  # because the kernel does not know about passing arguments.
-  # Marking argc and argv as zero.
-  pushq $0
-  pushq $0
+    # If not, push dummy argc/argv arguments.
+    # This happens when we are loaded by the kernel,
+    # because the kernel does not know about passing arguments.
+    # Marking argc and argv as zero.
+    pushq $0
+    pushq $0
 
 args_exist:
-  movq 8(%rsp), %rsi
-  movq (%rsp), %rdi
-  xorl %ebp, %ebp
-  call libmain
-  jmp .
+    movq 8(%rsp), %rsi
+    movq (%rsp), %rdi
+    xorl %ebp, %ebp
+    call libmain
+    jmp .
