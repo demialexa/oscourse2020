@@ -61,8 +61,8 @@ alloc_block(void) {
    * super->s_nblocks blocks in the disk altogether. */
   // LAB 10: Your code here.
   for (size_t i = 0; i < super->s_nblocks; i++) {
-    if (bitmap[i / 32] & (1 << (i % 32))) {
-      bitmap[i / 32] &= ~(1 << (i % 32));
+    if (bitmap[i / 32] & (1U << (i % 32))) {
+      bitmap[i / 32] &= ~(1U << (i % 32));
       flush_block(&bitmap[i/32]);
       return i;
     }
