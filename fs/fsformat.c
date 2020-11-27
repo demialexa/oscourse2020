@@ -213,7 +213,7 @@ main(int argc, char **argv) {
     usage();
 
   nblocks = strtol(argv[2], &s, 0);
-  if (*s || s == argv[2] || nblocks < 2 || nblocks > 1024)
+  if (*s || s == argv[2] || nblocks < 2 || nblocks > 10240)
     usage();
 
   opendisk(argv[1]);
