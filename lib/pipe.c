@@ -51,7 +51,7 @@ pipe(int pfd[2]) {
 
     if (debug) {
         cprintf("[%08x] pipecreate %08lx\n",
-                thisenv->env_id, (unsigned long)uvpt[PGNUM(va)]);
+                thisenv->env_id, (unsigned long)uvpt[VPT(va)]);
     }
 
     pfd[0] = fd2num(fd0);
@@ -99,7 +99,7 @@ devpipe_read(struct Fd *fd, void *vbuf, size_t n) {
     struct Pipe *p = (struct Pipe *)fd2data(fd);
     if (debug) {
         cprintf("[%08x] devpipe_read %08lx %lu rpos %ld wpos %ld\n",
-                thisenv->env_id, (unsigned long)uvpt[PGNUM(p)],
+                thisenv->env_id, (unsigned long)uvpt[VPT(p)],
                 (unsigned long)n, (long)p->p_rpos, (long)p->p_wpos);
     }
 
@@ -132,7 +132,7 @@ devpipe_write(struct Fd *fd, const void *vbuf, size_t n) {
     struct Pipe *p = (struct Pipe *)fd2data(fd);
     if (debug) {
         cprintf("[%08x] devpipe_write %08lx %lu rpos %ld wpos %ld\n",
-                thisenv->env_id, (unsigned long)uvpt[PGNUM(p)],
+                thisenv->env_id, (unsigned long)uvpt[VPT(p)],
                 (unsigned long)n, (long)p->p_rpos, (long)p->p_wpos);
     }
 

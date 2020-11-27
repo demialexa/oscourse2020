@@ -40,7 +40,7 @@ umain(int argc, char **argv) {
   if ((r = devfile.dev_stat(FVA, &st)) < 0)
     panic("file_stat: %ld", (long)r);
   if (strlen(msg) != st.st_size)
-    panic("file_stat returned size %ld wanted %d\n", (long)st.st_size, strlen(msg));
+    panic("file_stat returned size %ld wanted %zd\n", (long)st.st_size, strlen(msg));
   cprintf("file_stat is good\n");
 
   memset(buf, 0, sizeof buf);
@@ -91,7 +91,7 @@ umain(int argc, char **argv) {
 
   if ((r = open("/newmotd", O_RDONLY)) < 0)
     panic("open /newmotd: %ld", (long)r);
-  fd = (struct Fd *)(0xD0000000 + r * PGSIZE);
+  fd = (struct Fd *)(0xD0000000 + r * PAGE_SIZE);
   if (fd->fd_dev_id != 'f' || fd->fd_offset != 0 || fd->fd_omode != O_RDONLY)
     panic("open did not fill struct Fd correctly\n");
   cprintf("open is good\n");

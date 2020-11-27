@@ -30,7 +30,7 @@ duppage(envid_t dstenv, void *addr) {
     panic("sys_page_alloc: %i", r);
   if ((r = sys_page_map(dstenv, addr, 0, UTEMP, PTE_P | PTE_U | PTE_W)) < 0)
     panic("sys_page_map: %i", r);
-  memmove(UTEMP, addr, PGSIZE);
+  memmove(UTEMP, addr, PAGE_SIZE);
   if ((r = sys_page_unmap(0, UTEMP)) < 0)
     panic("sys_page_unmap: %i", r);
 }
@@ -62,11 +62,11 @@ dumbfork(void) {
   // We're the parent.
   // Eagerly copy our entire address space into the child.
   // This is NOT what you should do in your fork implementation.
-  for (addr = (uint8_t *)UTEXT; addr < end; addr += PGSIZE)
+  for (addr = (uint8_t *)UTEXT; addr < end; addr += PAGE_SIZE)
     duppage(envid, addr);
 
   // Also copy the stack we are currently running on.
-  duppage(envid, ROUNDDOWN(&addr, PGSIZE));
+  duppage(envid, ROUNDDOWN(&addr, PAGE_SIZE));
 
   // Start the child environment running
   if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)

@@ -9,7 +9,7 @@
 // File nodes (both in-memory and on-disk)
 
 // Bytes per file system block - same as page size
-#define BLKSIZE    PGSIZE
+#define BLKSIZE    PAGE_SIZE
 #define BLKBITSIZE (BLKSIZE * 8)
 
 // Maximum size of a filename (a single path component), including null
@@ -86,12 +86,12 @@ union Fsipc {
     size_t req_n;
   } read;
   struct Fsret_read {
-    char ret_buf[PGSIZE];
+    char ret_buf[PAGE_SIZE];
   } readRet;
   struct Fsreq_write {
     int req_fileid;
     size_t req_n;
-    char req_buf[PGSIZE - (2 * sizeof(size_t))];
+    char req_buf[PAGE_SIZE - (2 * sizeof(size_t))];
   } write;
   struct Fsreq_stat {
     int req_fileid;
@@ -109,7 +109,7 @@ union Fsipc {
   } remove;
 
   // Ensure Fsipc is one page
-  char _pad[PGSIZE];
+  char _pad[PAGE_SIZE];
 };
 
 #endif /* !JOS_INC_FS_H */

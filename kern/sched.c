@@ -74,7 +74,7 @@ sched_halt(void) {
       "pushq $0\n"
       "sti\n"
       "hlt\n"
-      :: "a"(cpu_ts.ts_esp0));
+      :: "a"(cpu_ts.ts_rsp0));
 
   /* Unreachable */
   for(;;);

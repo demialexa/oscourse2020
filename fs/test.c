@@ -56,17 +56,17 @@ fs_test(void) {
   uint32_t *bits;
 
   /* back up bitmap */
-  if ((r = sys_page_alloc(0, (void *)PGSIZE, PTE_P | PTE_U | PTE_W)) < 0)
+  if ((r = sys_page_alloc(0, (void *)PAGE_SIZE, PTE_P | PTE_U | PTE_W)) < 0)
     panic("sys_page_alloc: %i", r);
-  bits = (uint32_t *)PGSIZE;
-  memmove(bits, bitmap, PGSIZE);
+  bits = (uint32_t *)PAGE_SIZE;
+  memmove(bits, bitmap, PAGE_SIZE);
   /* allocate block */
   if ((r = alloc_block()) < 0)
     panic("alloc_block: %i", r);
   /* check that block was free */
-  assert(bits[r / 32] & (1 << (r % 32)));
+  assert(bits[r / 32] & (1U << (r % 32)));
   /* and is not free any more */
-  assert(!(bitmap[r / 32] & (1 << (r % 32))));
+  assert(!(bitmap[r / 32] & (1U << (r % 32))));
   cprintf("alloc_block is good\n");
   check_consistency();
   cprintf("fs consistency is good\n");
@@ -86,26 +86,26 @@ fs_test(void) {
   cprintf("file_get_block is good\n");
 
   *(volatile char *)blk = *(volatile char *)blk;
-  assert((uvpt[PGNUM(blk)] & PTE_D));
+  assert((uvpt[VPT(blk)] & PTE_D));
   file_flush(f);
-  assert(!(uvpt[PGNUM(blk)] & PTE_D));
+  assert(!(uvpt[VPT(blk)] & PTE_D));
   cprintf("file_flush is good\n");
 
   if ((r = file_set_size(f, 0)) < 0)
     panic("file_set_size: %i", r);
   assert(f->f_direct[0] == 0);
-  assert(!(uvpt[PGNUM(f)] & PTE_D));
+  assert(!(uvpt[VPT(f)] & PTE_D));
   cprintf("file_truncate is good\n");
 
   if ((r = file_set_size(f, strlen(msg))) < 0)
     panic("file_set_size 2: %i", r);
-  assert(!(uvpt[PGNUM(f)] & PTE_D));
+  assert(!(uvpt[VPT(f)] & PTE_D));
   if ((r = file_get_block(f, 0, &blk)) < 0)
     panic("file_get_block 2: %i", r);
   strcpy(blk, msg);
-  assert((uvpt[PGNUM(blk)] & PTE_D));
+  assert((uvpt[VPT(blk)] & PTE_D));
   file_flush(f);
-  assert(!(uvpt[PGNUM(blk)] & PTE_D));
-  assert(!(uvpt[PGNUM(f)] & PTE_D));
+  assert(!(uvpt[VPT(blk)] & PTE_D));
+  assert(!(uvpt[VPT(f)] & PTE_D));
   cprintf("file rewrite is good\n");
 }

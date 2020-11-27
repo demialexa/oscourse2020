@@ -22,10 +22,10 @@ struct Env *curenv = NULL;
 #ifdef CONFIG_KSPACE
 /* All environments */
 struct Env env_array[NENV];
-struct Env *envs   = env_array;
+struct Env *envs = env_array;
 #else
 /* All environments */
-struct Env *envs   = NULL;
+struct Env *envs = NULL;
 #endif
 
 /* Free environment list
@@ -50,7 +50,7 @@ static struct Env *env_free_list;
  * In particular, the last argument to the SEG macro used in the
  * definition of gdt specifies the Descriptor Privilege Level (DPL)
  * of that descriptor: 0 for kernel and 3 for user. */
-struct Segdesc gdt[2 * NCPU + 7] = {
+struct Segdesc32 gdt[2 * NCPU + 7] = {
     /* 0x0 - unused (always faults -- for trapping NULL far pointers) */
     SEG_NULL,
     /* 0x8 - kernel code segment */
@@ -58,9 +58,9 @@ struct Segdesc gdt[2 * NCPU + 7] = {
     /* 0x10 - kernel data segment */
     [GD_KD >> 3] = SEG64(STA_W, 0x0, 0xFFFFFFFF, 0),
     /* 0x18 - kernel code segment 32bit */
-    [GD_KT32 >> 3] = SEG(STA_X | STA_R, 0x0, 0xFFFFFFFF, 0),
+    [GD_KT32 >> 3] = SEG32(STA_X | STA_R, 0x0, 0xFFFFFFFF, 0),
     /* 0x20 - kernel data segment 32bit */
-    [GD_KD32 >> 3] = SEG(STA_W, 0x0, 0xFFFFFFFF, 0),
+    [GD_KD32 >> 3] = SEG32(STA_W, 0x0, 0xFFFFFFFF, 0),
     /* 0x28 - user code segment */
     [GD_UT >> 3] = SEG64(STA_X | STA_R, 0x0, 0xFFFFFFFF, 3),
     /* 0x30 - user data segment */
@@ -180,18 +180,18 @@ region_alloc(struct Env *env, void *va, size_t len) {
    *   You should round va down, and round (va + len) up.
    *   (Watch out for corner-cases!) */
 
-  void *end = ROUNDUP(va + len, PGSIZE);
-  va = ROUNDDOWN(va, PGSIZE);
+  void *end = ROUNDUP(va + len, PAGE_SIZE);
+  va = ROUNDDOWN(va, PAGE_SIZE);
   cprintf ("region: %p %lu -> %p\n", va, end - va, end);
 
   while (va < end) {
       struct PageInfo *pi = page_alloc(0);
       if (!pi) return -E_NO_MEM;
-      int res = page_insert(env->env_pml4e, pi, va, PTE_U | PTE_W);
+      int res = page_insert(env->env_pagetable, pi, va, PTE_U | PTE_W);
       if (res < 0) return res;
 
       page_decref(pi);
-      va += PGSIZE;
+      va += PAGE_SIZE;
   }
 
   return 0;
@@ -233,19 +233,20 @@ env_setup_vm(struct Env *env) {
 #define NUSERPML4 1
 
   /* page table pp_ref */
-  for (size_t i = NUSERPML4; i < NPMLENTRIES; i++)
-    if (kern_pml4e[i] & PTE_P && i != PML4(UVPT))
+  for (size_t i = NUSERPML4; i < PML4_ENTRY_COUNT; i++)
+    if (kern_pml4e[i] & PTE_P && i != PML4_INDEX(UVPT))
       pa2page(PTE_ADDR(kern_pml4e[i]))->pp_ref++;
 
-  env->env_pml4e = page2kva(pi);
+
+  env->env_pagetable = page2kva(pi);
   env->env_cr3 = page2pa(pi);
 
   /* Share pages between kernel space and userspace */
-  memcpy(env->env_pml4e + NUSERPML4, kern_pml4e + NUSERPML4,
-          PGSIZE - NUSERPML4 * sizeof(pml4e_t));
-  memset(env->env_pml4e, 0, NUSERPML4 * sizeof(pml4e_t));
+  memcpy(env->env_pagetable + NUSERPML4, kern_pml4e + NUSERPML4,
+          PAGE_SIZE - NUSERPML4 * sizeof(pml4e_t));
+  memset(env->env_pagetable, 0, NUSERPML4 * sizeof(pml4e_t));
 
-  env->env_pml4e[PML4(UVPT)] = env->env_cr3 | PTE_P | PTE_U;
+  env->env_pagetable[PML4_INDEX(UVPT)] = env->env_cr3 | PTE_P | PTE_U;
 
   return 0;
 }
@@ -322,7 +323,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
 
   /* For now init trapframe with IF set */
   env->env_tf.tf_rflags = FL_IF | (type == ENV_TYPE_FS ? FL_IOPL_3 : FL_IOPL_0);
-  
+
 
   /* Clear the page fault handler until user installs one. */
   env->env_pgfault_upcall = 0;
@@ -451,13 +452,13 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
 struct PageInfo *uvpt_pages = NULL;
 void
 uvpt_shadow_map(struct Env *e) {
-  uintptr_t va = ROUNDDOWN((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE, PGSIZE);
-  uintptr_t vend = ROUNDUP((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PGSIZE);
+  uintptr_t va = ROUNDDOWN((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE, PAGE_SIZE);
+  uintptr_t vend = ROUNDUP((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PAGE_SIZE);
 
-  for (struct PageInfo **link = &uvpt_pages; va < vend; va += PGSIZE) {
+  for (struct PageInfo **link = &uvpt_pages; va < vend; va += PAGE_SIZE) {
     if (!*link) *link = page_alloc(ALLOC_ZERO);
 
-    int res = page_insert(e->env_pml4e, *link, (void *)va, PTE_U | PTE_W);
+    int res = page_insert(e->env_pagetable, *link, (void *)va, PTE_U | PTE_W);
     if (res < 0) panic("Cannot allocate any memory for uvpt shadow mem");
 
     link = &(*link)->pp_link;
@@ -606,7 +607,7 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
   res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
   if (res < 0) return res;
 #endif
-  
+
   uintptr_t min_addr = UTOP, max_addr = 0;
   for (size_t i = 0; i < elf->e_phnum; i++) {
     if (ph[i].p_type == ELF_PROG_LOAD) {
@@ -724,17 +725,17 @@ env_free(struct Env *env) {
 
 #ifndef CONFIG_KSPACE
   /* Flush all mapped pages in the user portion of the address space */
-  static_assert(UTOP % PTSIZE == 0, "Misaligned UTOP");
+  static_assert(UTOP % HUGE_PAGE_SIZE == 0, "Misaligned UTOP");
 
   /* UTOP < PDPE[1] start, so all mapped memory should be in first PDPE */
-  pdpe_t *pdpe = KADDR(PTE_ADDR(env->env_pml4e[0]));
-  for (size_t pdpeno = 0; pdpeno <= PDPE(UTOP); pdpeno++) {
+  pdpe_t *pdpe = KADDR(PTE_ADDR(env->env_pagetable[0]));
+  for (size_t pdpeno = 0; pdpeno <= PDP_INDEX(UTOP); pdpeno++) {
     /*  only look at mapped page directory pointer index */
     if (!(pdpe[pdpeno] & PTE_P))
       continue;
 
     pde_t *pgdir = KADDR(PTE_ADDR(pdpe[pdpeno]));
-    size_t pdeno_limit = pdpeno == PDPE(UTOP) ? PDX(UTOP) : NPDPENTRIES;
+    size_t pdeno_limit = pdpeno == PDP_INDEX(UTOP) ? PD_INDEX(UTOP) : PDP_ENTRY_COUNT;
 
     for (size_t pdeno = 0; pdeno < pdeno_limit; pdeno++) {
 
@@ -747,8 +748,8 @@ env_free(struct Env *env) {
       pte_t *pt = (pte_t *)KADDR(pa);
 
       /* unmap all PTEs in this page table */
-      for (size_t pteno = 0; pteno < NPTENTRIES; pteno++) {
-        if (pt[pteno] & PTE_P) page_remove(env->env_pml4e, PGADDR((uint64_t)0, pdpeno, pdeno, pteno, 0));
+      for (size_t pteno = 0; pteno < PT_ENTRY_COUNT; pteno++) {
+        if (pt[pteno] & PTE_P) page_remove(env->env_pagetable, MAKE_ADDR((uint64_t)0, pdpeno, pdeno, pteno, 0));
       }
 
       /* free the page table itself */
@@ -763,12 +764,12 @@ env_free(struct Env *env) {
   }
 
   /* free the page directory pointer */
-  page_decref(pa2page(PTE_ADDR(env->env_pml4e[0])));
+  page_decref(pa2page(PTE_ADDR(env->env_pagetable[0])));
 
   /* free the page map level 4 (PML4) */
   physaddr_t pa = env->env_cr3;
-  env->env_pml4e[0] = 0;
-  env->env_pml4e = 0;
+  env->env_pagetable[0] = 0;
+  env->env_pagetable = 0;
   env->env_cr3 = 0;
   page_decref(pa2page(pa));
 #endif

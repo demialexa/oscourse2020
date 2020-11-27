@@ -9,14 +9,14 @@
 
 #define ASM 1
 
-int
+size_t
 strlen(const char *s) {
     size_t n = 0;
     while (*s++) n++;
     return n;
 }
 
-int
+size_t
 strnlen(const char *s, size_t size) {
     size_t n = 0;
     while (n < size && *s++) n++;
@@ -92,23 +92,19 @@ strncmp(const char *p, const char *q, size_t n) {
 }
 
 /* Return a pointer to the first occurrence of 'c' in 's',
- * or a null pointer if the string has no 'c' */
+ * or a pointer to the string-ending null character if the string has no 'c' */
 char *
-strchr(const char *str, char c) {
-    for (; *str; str++) {
-        if (*str == c) {
-            return (char *)str;
-        }
-    }
-    return NULL;
+strfind(const char *str, int ch) {
+    while (*str && *str != ch) str++;
+    return (char *)str;
 }
 
 /* Return a pointer to the first occurrence of 'c' in 's',
- * or a pointer to the string-ending null character if the string has no 'c' */
+ * or a null pointer if the string has no 'c' */
 char *
-strfind(const char *str, char ch) {
-    for (; *str && *str == ch; str++) /* nothing */;
-    return (char *)str;
+strchr(const char *str, int ch) {
+    while (*str && *str != ch) str++;
+    return *str == ch ? (char *)str : NULL;
 }
 
 #if ASM

@@ -22,7 +22,7 @@ pgfault(struct UTrapframe *utf) {
     // LAB 9: Your code here:
     pte_t ent = get_uvpt_entry((void *)utf->utf_fault_va);
     if ((ent & (PTE_COW | PTE_P)) != (PTE_P | PTE_COW) || !(utf->utf_err & FEC_WR))
-        panic("User pagefault at %p\n", (void *)utf->utf_fault_va);
+        panic("User pagefault at va=%p ip=%p\n", (void *)utf->utf_fault_va, (void *)utf->utf_rip);
 
     /* Allocate a new page, map it at a temporary location (PFTEMP),
      * copy the data from the old page to the new page, then move the new
@@ -34,9 +34,9 @@ pgfault(struct UTrapframe *utf) {
 
     // LAB 9: Your code here:
 
-    void *addr = (void *)ROUNDDOWN(utf->utf_fault_va, PGSIZE);
+    void *addr = (void *)ROUNDDOWN(utf->utf_fault_va, PAGE_SIZE);
 
-    if (pages[PTE_ADDR(ent) >> PGSHIFT].pp_ref == 0) {
+    if (pageref(addr) == 1) {
         /* Only one reference, no need to copy */
         res = sys_page_map(0, addr, 0, addr, PTE_U | PTE_P | PTE_W);
         if (res < 0) panic("[pagefault] sys_page_map: %i\n", res);
@@ -46,9 +46,9 @@ pgfault(struct UTrapframe *utf) {
         if (res < 0) panic("[pagefault] sys_page_alloc: %i\n", res);
 
 #ifdef SANITIZE_USER_SHADOW_BASE
-        __nosan_memcpy(PFTEMP, addr, PGSIZE);
+        __nosan_memcpy(PFTEMP, addr, PAGE_SIZE);
 #else
-        memcpy(PFTEMP, addr, PGSIZE);
+        memcpy(PFTEMP, addr, PAGE_SIZE);
 #endif
 
         res = sys_page_map(0, PFTEMP, 0, addr, PTE_U | PTE_P | PTE_W);
@@ -60,7 +60,7 @@ pgfault(struct UTrapframe *utf) {
 
 }
 
-/* Map our virtual page pn (address pn*PGSIZE) into the target envid
+/* Map our virtual page pn (address pn*PAGE_SIZE) into the target envid
  * at the same virtual address.  If the page is writable or copy-on-write,
  * the new mapping must be created copy-on-write, and then our mapping must be
  * marked copy-on-write as well.  (Exercise: Why do we need to mark ours
@@ -74,12 +74,12 @@ duppage(envid_t envid, uintptr_t pn) {
     // LAB 9: Your code here:
 
     pte_t ent = uvpt[pn];
-    int res = sys_page_map(0, (void *)(pn * PGSIZE), envid,
-                              (void *)(pn * PGSIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
+    int res = sys_page_map(0, (void *)(pn * PAGE_SIZE), envid,
+                              (void *)(pn * PAGE_SIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
 
     if (res >= 0 && ent & PTE_W) {
-        res = sys_page_map(0, (void *)(pn * PGSIZE), 0,
-                              (void *)(pn * PGSIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
+        res = sys_page_map(0, (void *)(pn * PAGE_SIZE), 0,
+                              (void *)(pn * PAGE_SIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
     }
     return res;
 }
@@ -104,37 +104,38 @@ fork(void) {
 
     set_pgfault_handler(pgfault);
     int err = 0, res = sys_exofork();
-    if (!res) thisenv = &envs[ENVX(sys_getenvid())];
+    thisenv = &envs[ENVX(sys_getenvid())];
+
     if (res <= 0) return res;
 
 
-    for (size_t i = 0; i < UTOP; i += PGSIZE) {
-        if (!(uvpml4e[VPML4E(i)] & PTE_P)) {
-            i += PGSIZE*NPTENTRIES*NPDENTRIES*(NPDPENTRIES*1LL) - PGSIZE;
+    for (size_t i = 0; i < UTOP; i += PAGE_SIZE) {
+        if (!(uvpml4[VPML4(i)] & PTE_P)) {
+            i += HUGE_PAGE_SIZE*PD_ENTRY_COUNT*PDP_ENTRY_COUNT - PAGE_SIZE;
             continue;
         }
-        if (!(uvpde[VPDPE(i)] & PTE_P)) {
-            i += PGSIZE*NPTENTRIES*NPDENTRIES - PGSIZE;
+        if (!(uvpdp[VPDP(i)] & PTE_P)) {
+            i += HUGE_PAGE_SIZE*PD_ENTRY_COUNT - PAGE_SIZE;
             continue;
         }
         if (!(uvpd[VPD(i)] & PTE_P)) {
-            i += PGSIZE*NPTENTRIES - PGSIZE;
+            i += HUGE_PAGE_SIZE - PAGE_SIZE;
             continue;
         }
         if (
 #ifdef SANITIZE_USER_SHADOW_BASE
-#define _IN(x)  (i >= ROUNDDOWN(SANITIZE_USER##x##SHADOW_BASE, PGSIZE) &&\
-                 i < ROUNDUP(SANITIZE_USER##x##SHADOW_BASE + SANITIZE_USER##x##SHADOW_SIZE, PGSIZE))
+#define _IN(x)  (i >= ROUNDDOWN(SANITIZE_USER##x##SHADOW_BASE, PAGE_SIZE) &&\
+                 i < ROUNDUP(SANITIZE_USER##x##SHADOW_BASE + SANITIZE_USER##x##SHADOW_SIZE, PAGE_SIZE))
             _IN(_) || _IN(_EXTRA_) || _IN(_FS_) || _IN(_VPT_) ||
 #undef _IN
 #endif
             (i >= UXSTACKTOP - UXSTACKSIZE && i < UXSTACKTOP)) {
                 err = sys_page_alloc(res, (void *)i, PTE_U | PTE_P | PTE_W);
-        } else if (uvpt[PGNUM(i)] & PTE_P) {
-            if (uvpt[PGNUM(i)] & PTE_SHARE) {
-                err = sys_page_map(0, (void *)i, res, (void *)i, uvpt[PGNUM(i)] & PTE_SYSCALL);
+        } else if (uvpt[VPT(i)] & PTE_P) {
+            if (uvpt[VPT(i)] & PTE_SHARE) {
+                err = sys_page_map(0, (void *)i, res, (void *)i, uvpt[VPT(i)] & PTE_SYSCALL);
           } else {
-                err = duppage(res, PGNUM(i));
+                err = duppage(res, VPT(i));
           }
         }
         if (err < 0) goto error;

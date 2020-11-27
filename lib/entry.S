@@ -3,7 +3,7 @@
 
 .data
 
-# Define the global symbols 'envs', 'pages', 'uvpt', 'uvpd', 'uvpde' and 'uvpml4e'
+# Define the global symbols 'envs', 'pages', 'uvpt', 'uvpd', 'uvpdp' and 'uvpml4'
 # so that they can be used in C as if they were ordinary global arrays
 .globl envs
 .set envs, UENVS
@@ -12,11 +12,11 @@
 .globl uvpt
 .set uvpt, UVPT
 .globl uvpd
-.set uvpd, uvpt+UVPTSIZE
-.globl uvpde
-.set uvpde,uvpd+UVPDSIZE
-.globl uvpml4e
-.set uvpml4e,uvpde+UVPDESIZE
+.set uvpd, UVPD
+.globl uvpdp
+.set uvpdp,UVPDP
+.globl uvpml4
+.set uvpml4,UVPML4
 
 # Entrypoint - this is where the kernel (or our parent environment)
 # starts us running when we are initially loaded into a new environment

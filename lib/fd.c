@@ -6,19 +6,19 @@
 #define FDTABLE 0xD0000000ll
 /* Bottom of file data area.  We reserve one data page for each FD,
  * which devices can use if they choose. */
-#define FILEDATA (FDTABLE + MAXFD * PGSIZE)
+#define FILEDATA (FDTABLE + MAXFD * PAGE_SIZE)
 
 /* Return the 'struct Fd*' for file descriptor index i */
-#define INDEX2FD(i) ((struct Fd *)(FDTABLE + (i)*PGSIZE))
+#define INDEX2FD(i) ((struct Fd *)(FDTABLE + (i)*PAGE_SIZE))
 /* Return the file data page for file descriptor index i */
-#define INDEX2DATA(i) ((char *)(FILEDATA + (i)*PGSIZE))
+#define INDEX2DATA(i) ((char *)(FILEDATA + (i)*PAGE_SIZE))
 
 
 /********************File descriptor manipulators***********************/
 
 uint64_t
 fd2num(struct Fd *fd) {
-    return ((uintptr_t)fd - FDTABLE) / PGSIZE;
+    return ((uintptr_t)fd - FDTABLE) / PAGE_SIZE;
 }
 
 char *
@@ -48,7 +48,7 @@ fd_alloc(struct Fd **fd_store) {
         if (!(get_uvpt_entry(fd) & PTE_P)) {
             *fd_store = fd;
 #ifdef SANITIZE_USER_SHADOW_BASE
-            platform_asan_unpoison(fd, PGSIZE);
+            platform_asan_unpoison(fd, PAGE_SIZE);
 #endif
             return 0;
         }

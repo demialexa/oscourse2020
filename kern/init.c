@@ -59,7 +59,7 @@ alloc_pde_early_boot(void) {
   if (pdefree >= (uintptr_t)&pdefreeend) return NULL;
 
   pde_t *ret = (pde_t *)pdefree;
-  pdefree += PGSIZE;
+  pdefree += PAGE_SIZE;
   return ret;
 }
 
@@ -71,18 +71,18 @@ map_addr_early_boot(uintptr_t addr, uintptr_t addr_phys, size_t sz) {
   pdpe_t *pdpt;
   pde_t *pde;
 
-  uintptr_t addr_curr = ROUNDDOWN(addr, PTSIZE);
-  uintptr_t addr_curr_phys = ROUNDDOWN(addr_phys, PTSIZE);
-  uintptr_t addr_end = ROUNDUP(addr + sz, PTSIZE);
+  uintptr_t addr_curr = ROUNDDOWN(addr, HUGE_PAGE_SIZE);
+  uintptr_t addr_curr_phys = ROUNDDOWN(addr_phys, HUGE_PAGE_SIZE);
+  uintptr_t addr_end = ROUNDUP(addr + sz, HUGE_PAGE_SIZE);
 
-  pdpt = (pdpe_t *)PTE_ADDR(pml4[PML4(addr_curr)]);
-  for (; addr_curr < addr_end; addr_curr += PTSIZE, addr_curr_phys += PTSIZE) {
-    pde = (pde_t *)PTE_ADDR(pdpt[PDPE(addr_curr)]);
+  pdpt = (pdpe_t *)PTE_ADDR(pml4[PML4_INDEX(addr_curr)]);
+  for (; addr_curr < addr_end; addr_curr += HUGE_PAGE_SIZE, addr_curr_phys += HUGE_PAGE_SIZE) {
+    pde = (pde_t *)PTE_ADDR(pdpt[PDP_INDEX(addr_curr)]);
     if (!pde) {
       pde = alloc_pde_early_boot();
-      pdpt[PDPE(addr_curr)] = (uintptr_t)pde | PTE_P | PTE_W;
+      pdpt[PDP_INDEX(addr_curr)] = (uintptr_t)pde | PTE_P | PTE_W;
     }
-    pde[PDX(addr_curr)] = addr_curr_phys | PTE_P | PTE_W | PTE_MBZ;
+    pde[PD_INDEX(addr_curr)] = addr_curr_phys | PTE_P | PTE_W | PTE_MBZ;
   }
 }
 
@@ -130,7 +130,6 @@ i386_init(void) {
   while (ctor < &__ctors_end) (*ctor++)();
 
   pic_init();
-  clock_idt_init();
 
 #ifdef SANITIZE_SHADOW_BASE
   kasan_mem_init();

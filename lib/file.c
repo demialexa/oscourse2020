@@ -2,7 +2,7 @@
 #include <inc/string.h>
 #include <inc/lib.h>
 
-union Fsipc fsipcbuf __attribute__((aligned(PGSIZE)));
+union Fsipc fsipcbuf __attribute__((aligned(PAGE_SIZE)));
 
 /* Send an inter-environment request to the file server, and wait for
  * a reply.  The request body should be in fsipcbuf, and parts of the
@@ -15,7 +15,7 @@ fsipc(unsigned type, void *dstva) {
     static envid_t fsenv;
     if (!fsenv) fsenv = ipc_find_env(ENV_TYPE_FS);
 
-    static_assert(sizeof(fsipcbuf) == PGSIZE, "Invalid fsipcbuf size");
+    static_assert(sizeof(fsipcbuf) == PAGE_SIZE, "Invalid fsipcbuf size");
 
     if (debug) {
         cprintf("[%08x] fsipc %d %08x\n",

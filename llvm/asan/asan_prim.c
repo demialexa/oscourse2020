@@ -17,12 +17,67 @@
 #include "asan_internal.h"
 #include "asan_memintrinsics.h"
 
-/* Not sanitised functions needed for asan itself
- */
+#define ASM 1
+
+/* Not sanitised functions needed for asan itself */
+
+#ifdef ASM
 
 void *
+__nosan_memset(void *v, int c, size_t n) {
+    uint8_t *ptr = v;
+    intptr_t ni = n;
+
+    if ((ni -= ((uintptr_t)v & 7)) < 0) {
+        while (n-- > 0) *ptr++ = c;
+        return v;
+    }
+
+    uint64_t k = 0x101010101010101ULL * (c & 0xFFU);
+
+    if ((uintptr_t)ptr & 7) {
+        if ((uintptr_t)ptr & 1) *ptr = k, ptr += 1;
+        if ((uintptr_t)ptr & 2) *(uint16_t *)ptr = k, ptr += 2;
+        if ((uintptr_t)ptr & 4) *(uint32_t *)ptr = k, ptr += 4;
+    }
+
+    if (ni / 8) {
+        asm volatile("cld; rep stosq\n"
+                     ::"D"(ptr), "a"(k), "c"(ni / 8)
+                     : "cc", "memory");
+        ni &= 7;
+    }
+
+    if (ni) {
+        if (ni & 4) *(uint32_t *)ptr = k, ptr += 4;
+        if (ni & 2) *(uint16_t *)ptr = k, ptr += 2;
+        if (ni & 1) *ptr = k;
+    }
+
+    return v;
+}
+
+void *
+__nosan_memcpy(void *dst, const void *src, size_t n) {
+    const char *s = src;
+    char *d = dst;
+
+    if (!(((intptr_t)s & 7) | ((intptr_t)d & 7) | (n & 7))) {
+      asm volatile("cld; rep movsq\n"
+                   ::"D"(d), "S"(s), "c"(n / 8)
+                   : "cc", "memory");
+    } else {
+      asm volatile("cld; rep movsb\n"
+                   ::"D"(d), "S"(s), "c"(n)
+                   : "cc", "memory");
+    }
+    return dst;
+}
+
+#else
+void *
 __nosan_memset(void *src, int c, size_t sz) {
-  // We absolutely must implement this for ASAN functioning.
+  /* We absolutely must implement this for ASAN functioning. */
   volatile char *vptr = (volatile char *)(src);
   while (sz--) {
     *vptr++ = c;
@@ -40,3 +95,4 @@ __nosan_memcpy(void *dst, const void *src, size_t sz) {
 
   return dst;
 }
+#endif

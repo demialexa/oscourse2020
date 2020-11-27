@@ -25,7 +25,7 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf)) {
     if (!_pgfault_handler) {
         /* First time through! */
         // LAB 9: Your code here:
-        res = sys_page_alloc(envid, (void*)(UXSTACKTOP - PGSIZE), PTE_UWP);
+        res = sys_page_alloc(envid, (void*)(UXSTACKTOP - PAGE_SIZE), PTE_UWP);
         if (res) goto end;
       }
 

@@ -137,7 +137,7 @@ spawn(const char *prog, const char **argv) {
 
     for (uintptr_t addr = SANITIZE_USER_VPT_SHADOW_BASE;
                  addr < SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE;
-                 addr += PGSIZE) {
+                 addr += PAGE_SIZE) {
         res = sys_page_map(0, (void *)addr, child, (void *)addr, PTE_P | PTE_U | PTE_W);
         if (res < 0) goto error;
     }
@@ -178,6 +178,8 @@ spawnl(const char *prog, const char *arg0, ...) {
     va_start(vl, arg0);
     while (va_arg(vl, void *) != NULL) argc++;
     va_end(vl);
+
+    cprintf(">>>>>>>>>>SPAWN [from %08x]\n", thisenv->env_id);
 
     /* Now that we have the size of the args, do a second pass
     * and store the values in a VLA, which has the format of argv */
@@ -230,7 +232,7 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp) {
     if ((void *)(argv_store - 2) < (void *)UTEMP) return -E_NO_MEM;
 
     /* Allocate the stack pages at UTEMP. */
-    for (i = 0; i < USTACKSIZE; i += PGSIZE) {
+    for (i = 0; i < USTACKSIZE; i += PAGE_SIZE) {
         if ((res = sys_page_alloc(0, (void *)UTEMP + i, PTE_UWP)) < 0)
             return res;
     }
@@ -266,7 +268,7 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp) {
 
     /* After completing the stack, map it into the child's address space
      * and unmap it from ours! */
-    for (i = 0; i < USTACKSIZE; i += PGSIZE) {
+    for (i = 0; i < USTACKSIZE; i += PAGE_SIZE) {
         if ((res = sys_page_map(0, UTEMP + i, child,
             (void *)(USTACKTOP - USTACKSIZE + i), PTE_UWP)) < 0) goto error;
         if ((res = sys_page_unmap(0, UTEMP + i)) < 0) goto error;
@@ -275,7 +277,7 @@ init_stack(envid_t child, const char **argv, uintptr_t *init_esp) {
   return 0;
 
 error:
-  for (i = 0; i < USTACKSIZE; i += PGSIZE)
+  for (i = 0; i < USTACKSIZE; i += PAGE_SIZE)
     sys_page_unmap(0, UTEMP + i);
   return res;
 }
@@ -286,7 +288,7 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
 
     //cprintf("map_segment %x+%x\n", va, memsz);
 
-    int res = PGOFF(va);
+    int res = PAGE_OFFSET(va);
     if (res) {
         va -= res;
         memsz += res;
@@ -294,7 +296,7 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
         fileoffset -= res;
     }
 
-    for (size_t i = 0; i < memsz; i += PGSIZE) {
+    for (size_t i = 0; i < memsz; i += PAGE_SIZE) {
         if (i >= filesz) {
             /* allocate a blank page */
             if ((res = sys_page_alloc(child, (void *)(va + i), perm)) < 0) return res;
@@ -302,7 +304,7 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
             /* from file */
             if ((res = sys_page_alloc(0, UTEMP, PTE_UWP)) < 0) return res;
             if ((res = seek(fd, fileoffset + i)) < 0) return res;
-            if ((res = readn(fd, UTEMP, MIN(PGSIZE, filesz - i))) < 0) return res;
+            if ((res = readn(fd, UTEMP, MIN(PAGE_SIZE, filesz - i))) < 0) return res;
             if ((res = sys_page_map(0, UTEMP, child, (void *)(va + i), perm)) < 0)
                 panic("spawn: sys_page_map data: %i", res);
             sys_page_unmap(0, UTEMP);
@@ -315,24 +317,25 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
 static int
 copy_shared_pages(envid_t child) {
     // LAB 11: Your code here:
-    for (size_t i = 0; i < UTOP; i += PGSIZE) {
-        if (!(uvpml4e[VPML4E(i)] & PTE_P)) {
-            i += PGSIZE*NPTENTRIES*NPDENTRIES*(NPDPENTRIES*1LL) - PGSIZE;
+    int err = 0;
+    for (size_t i = 0; i < UTOP; i += PAGE_SIZE) {
+        if (!(uvpml4[VPML4(i)] & PTE_P)) {
+            i += HUGE_PAGE_SIZE*PD_ENTRY_COUNT*PDP_ENTRY_COUNT - PAGE_SIZE;
             continue;
         }
-        if (!(uvpde[VPDPE(i)] & PTE_P)) {
-            i += PGSIZE*NPTENTRIES*NPDENTRIES - PGSIZE;
+        if (!(uvpdp[VPDP(i)] & PTE_P)) {
+            i += HUGE_PAGE_SIZE*PD_ENTRY_COUNT - PAGE_SIZE;
             continue;
         }
         if (!(uvpd[VPD(i)] & PTE_P)) {
-            i += PGSIZE*NPTENTRIES - PGSIZE;
+            i += HUGE_PAGE_SIZE - PAGE_SIZE;
             continue;
         }
-        if ((uvpt[PGNUM(i)] & (PTE_P | PTE_SHARE)) == (PTE_P | PTE_SHARE)) {
-            int err = sys_page_map(0, (void *)i, child, (void *)i, uvpt[PGNUM(i)] & PTE_SYSCALL);
-            if (err < 0) return err;
+        if ((uvpt[VPT(i)] & (PTE_P | PTE_SHARE)) == (PTE_P | PTE_SHARE)) {
+            err = sys_page_map(0, (void *)i, child, (void *)i, uvpt[VPT(i)] & PTE_SYSCALL);
+            if (err < 0) break;
         }
     }
 
-    return 0;
+    return err;
 }

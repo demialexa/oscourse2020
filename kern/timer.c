@@ -24,19 +24,19 @@
  * virtual memory mapping in the future. */
 static void *
 mmio_map_region(physaddr_t pa, size_t size) {
-  void map_addr_early_boot(uintptr_t addr, uintptr_t addr_phys, size_t sz);
-  const physaddr_t base_2mb = 0x200000;
-  uintptr_t org             = pa;
-  size += pa & (base_2mb - 1);
-  size += (base_2mb - 1);
-  pa &= ~(base_2mb - 1);
-  size &= ~(base_2mb - 1);
-  map_addr_early_boot(pa, pa, size);
-  return (void *)org;
+    void map_addr_early_boot(uintptr_t addr, uintptr_t addr_phys, size_t sz);
+    const physaddr_t base_2mb = 0x200000;
+    uintptr_t org             = pa;
+    size += pa & (base_2mb - 1);
+    size += (base_2mb - 1);
+    pa &= ~(base_2mb - 1);
+    size &= ~(base_2mb - 1);
+    map_addr_early_boot(pa, pa, size);
+    return (void *)org;
 }
 static void *
 mmio_remap_last_region(physaddr_t pa, void *addr, size_t oldsz, size_t newsz) {
-  return mmio_map_region(pa, newsz);
+    return mmio_map_region(pa, newsz);
 }
 #endif
 
@@ -67,131 +67,134 @@ struct Timer timer_acpipm = {
 
 void
 acpi_enable(void) {
-  FADT *fadt = get_fadt();
-  outb(fadt->SMI_CommandPort, fadt->AcpiEnable);
-  while ((inw(fadt->PM1aControlBlock) & 1) == 0) {
-  }
+    FADT *fadt = get_fadt();
+    outb(fadt->SMI_CommandPort, fadt->AcpiEnable);
+    while ((inw(fadt->PM1aControlBlock) & 1) == 0) /* nothing */;
 }
 
 static void *acpi_find_table(const char *sign) {
-  static RSDT *krsdt;
-  static size_t krsdt_len;
-  static size_t krsdt_entsz;
+    // LAB 5: Your code here:
 
-  uint8_t cksm = 0;
+    static RSDT *krsdt;
+    static size_t krsdt_len;
+    static size_t krsdt_entsz;
 
-  if (!krsdt) {
-    if (!uefi_lp->ACPIRoot) panic("No rsdp\n");
-    RSDP *krsdp = mmio_map_region(uefi_lp->ACPIRoot, sizeof(RSDP));
+    uint8_t cksm = 0;
 
-    if (strncmp(krsdp->Signature, "RSD PTR ", 8)) panic("RSDP is invalid");
+    if (!krsdt) {
+        if (!uefi_lp->ACPIRoot) panic("No rsdp\n");
+        RSDP *krsdp = mmio_map_region(uefi_lp->ACPIRoot, sizeof(RSDP));
 
-    for (size_t i = 0; i < offsetof(RSDP, Length); i++)
-      cksm = (uint8_t)(cksm + ((uint8_t*)krsdp)[i]);
-    if (cksm) panic("RSDP is invalid");
+        if (strncmp(krsdp->Signature, "RSD PTR ", 8)) panic("RSDP is invalid");
 
-    uint64_t rsdt_pa = krsdp->RsdtAddress;
-    krsdt_entsz = 4;
-    if (krsdp->Revision) {
-      /* ACPI version >= 2.0 */
-      for (size_t i = 0; i < krsdp->Length; i++)
-        cksm = (uint8_t)(cksm + ((uint8_t*)krsdp)[i]);
-      if (cksm) panic("RSDP is invalid");
+        for (size_t i = 0; i < offsetof(RSDP, Length); i++)
+            cksm = (uint8_t)(cksm + ((uint8_t*)krsdp)[i]);
+        if (cksm) panic("RSDP is invalid");
 
-      rsdt_pa = krsdp->XsdtAddress;
-      krsdt_entsz = 8;
+        uint64_t rsdt_pa = krsdp->RsdtAddress;
+        krsdt_entsz = 4;
+        if (krsdp->Revision) {
+            /* ACPI version >= 2.0 */
+            for (size_t i = 0; i < krsdp->Length; i++)
+                cksm = (uint8_t)(cksm + ((uint8_t*)krsdp)[i]);
+            if (cksm) panic("RSDP is invalid");
+
+            rsdt_pa = krsdp->XsdtAddress;
+            krsdt_entsz = 8;
+        }
+
+        krsdt = mmio_map_region(rsdt_pa, sizeof(RSDT));
+        /* Remap since we can obtain table length only after mapping */
+        krsdt = mmio_remap_last_region(rsdt_pa, krsdt, sizeof(RSDT), krsdt->h.Length);
+
+        for (size_t i = 0; i < krsdt->h.Length; i++)
+            cksm = (uint8_t)(cksm + ((uint8_t*)krsdt)[i]);
+        if (cksm) panic("RSDT is invalid");
+
+        if (strncmp(krsdt->h.Signature, krsdp->Revision ?
+            "XSDT" : "RSDT", 4)) panic("RSDT is invalid");
+
+        krsdt_len = (krsdt->h.Length - sizeof(RSDT))/4;
+        if (krsdp->Revision) krsdt_len /= 2;
     }
 
-    krsdt = mmio_map_region(rsdt_pa, sizeof(RSDT));
-    /* Remap since we can obtain table length only after mapping */
-    krsdt = mmio_remap_last_region(rsdt_pa, krsdt, sizeof(RSDT), krsdt->h.Length);
+    ACPISDTHeader *hd = NULL;
 
-    for (size_t i = 0; i < krsdt->h.Length; i++)
-      cksm = (uint8_t)(cksm + ((uint8_t*)krsdt)[i]);
-    if (cksm) panic("RSDT is invalid");
+    for (size_t i = 0; i < krsdt_len; i++) {
+        /* Assume little endian */
+        uint64_t fadt_pa = 0;
+        memcpy(&fadt_pa, (uint8_t *)krsdt->PointerToOtherSDT + i*krsdt_entsz, krsdt_entsz);
 
-    if (strncmp(krsdt->h.Signature, krsdp->Revision ?
-        "XSDT" : "RSDT", 4)) panic("RSDT is invalid");
+        hd = mmio_map_region(fadt_pa, sizeof(ACPISDTHeader));
+        /* Remap since we can obtain table length only after mapping */
+        hd = mmio_remap_last_region(fadt_pa, hd, sizeof(ACPISDTHeader), krsdt->h.Length);
 
-    krsdt_len = (krsdt->h.Length - sizeof(RSDT))/4;
-    if (krsdp->Revision) krsdt_len /= 2;
-  }
+        for (size_t i = 0; i < hd->Length; i++)
+            cksm = (uint8_t)(cksm + ((uint8_t*)hd)[i]);
+        if (cksm) panic("ACPI table '%.4s' is invalid", hd->Signature);
+        if (!strncmp(hd->Signature, sign, 4)) return hd;
+    }
 
-  ACPISDTHeader *hd = NULL;
-
-  for (size_t i = 0; i < krsdt_len; i++) {
-    /* Assume little endian */
-    uint64_t fadt_pa = 0;
-    memcpy(&fadt_pa, (uint8_t *)krsdt->PointerToOtherSDT + i*krsdt_entsz, krsdt_entsz);
-
-    hd = mmio_map_region(fadt_pa, sizeof(ACPISDTHeader));
-    /* Remap since we can obtain table length only after mapping */
-    hd = mmio_remap_last_region(fadt_pa, hd, sizeof(ACPISDTHeader), krsdt->h.Length);
-
-    for (size_t i = 0; i < hd->Length; i++)
-      cksm = (uint8_t)(cksm + ((uint8_t*)hd)[i]);
-    if (cksm) panic("ACPI table '%.4s' is invalid", hd->Signature);
-    if (!strncmp(hd->Signature, sign, 4)) return hd;
-  }
-
-  return NULL;
+    return NULL;
 }
 
 /* Obtain and map FADT ACPI table address. */
 FADT *
 get_fadt(void) {
-  // LAB 5: Your code here:
-  static FADT *kfadt;
-  if (!kfadt) kfadt = acpi_find_table("FACP");
-  return kfadt;
+    // LAB 5: Your code here
+
+    static FADT *kfadt;
+    if (!kfadt) kfadt = acpi_find_table("FACP");
+    return kfadt;
 }
 
 /* Obtain and map RSDP ACPI table address. */
 HPET *
 get_hpet(void) {
-  // LAB 5: Your code here:
-  static HPET *khpet;
-  if (!khpet) khpet = acpi_find_table("HPET");
-  return khpet;
+    // LAB 5: Your code here
+
+    static HPET *khpet;
+    if (!khpet) khpet = acpi_find_table("HPET");
+    return khpet;
 }
 
 /* Getting physical HPET timer address from its table. */
 HPETRegister *
 hpet_register(void) {
-  HPET *hpet_timer = get_hpet();
-  if (!hpet_timer->address.address) panic("hpet is unavailable\n");
+    HPET *hpet_timer = get_hpet();
+    if (!hpet_timer->address.address) panic("hpet is unavailable\n");
 
-  uintptr_t paddr = hpet_timer->address.address;
-  return mmio_map_region(paddr, sizeof(HPETRegister));
+    uintptr_t paddr = hpet_timer->address.address;
+    return mmio_map_region(paddr, sizeof(HPETRegister));
 }
 
 /* Debug HPET timer state. */
 void
 hpet_print_struct(void) {
-  HPET *hpet = get_hpet();
-  cprintf("signature = %s\n", (hpet->h).Signature);
-  cprintf("length = %08x\n", (hpet->h).Length);
-  cprintf("revision = %08x\n", (hpet->h).Revision);
-  cprintf("checksum = %08x\n", (hpet->h).Checksum);
+    HPET *hpet = get_hpet();
+    cprintf("signature = %s\n", (hpet->h).Signature);
+    cprintf("length = %08x\n", (hpet->h).Length);
+    cprintf("revision = %08x\n", (hpet->h).Revision);
+    cprintf("checksum = %08x\n", (hpet->h).Checksum);
 
-  cprintf("oem_revision = %08x\n", (hpet->h).OEMRevision);
-  cprintf("creator_id = %08x\n", (hpet->h).CreatorID);
-  cprintf("creator_revision = %08x\n", (hpet->h).CreatorRevision);
+    cprintf("oem_revision = %08x\n", (hpet->h).OEMRevision);
+    cprintf("creator_id = %08x\n", (hpet->h).CreatorID);
+    cprintf("creator_revision = %08x\n", (hpet->h).CreatorRevision);
 
-  cprintf("hardware_rev_id = %08x\n", hpet->hardware_rev_id);
-  cprintf("comparator_count = %08x\n", hpet->comparator_count);
-  cprintf("counter_size = %08x\n", hpet->counter_size);
-  cprintf("reserved = %08x\n", hpet->reserved);
-  cprintf("legacy_replacement = %08x\n", hpet->legacy_replacement);
-  cprintf("pci_vendor_id = %08x\n", hpet->pci_vendor_id);
-  cprintf("hpet_number = %08x\n", hpet->hpet_number);
-  cprintf("minimum_tick = %08x\n", hpet->minimum_tick);
+    cprintf("hardware_rev_id = %08x\n", hpet->hardware_rev_id);
+    cprintf("comparator_count = %08x\n", hpet->comparator_count);
+    cprintf("counter_size = %08x\n", hpet->counter_size);
+    cprintf("reserved = %08x\n", hpet->reserved);
+    cprintf("legacy_replacement = %08x\n", hpet->legacy_replacement);
+    cprintf("pci_vendor_id = %08x\n", hpet->pci_vendor_id);
+    cprintf("hpet_number = %08x\n", hpet->hpet_number);
+    cprintf("minimum_tick = %08x\n", hpet->minimum_tick);
 
-  cprintf("address_structure:\n");
-  cprintf("address_space_id = %08x\n", (hpet->address).address_space_id);
-  cprintf("register_bit_width = %08x\n", (hpet->address).register_bit_width);
-  cprintf("register_bit_offset = %08x\n", (hpet->address).register_bit_offset);
-  cprintf("address = %08lx\n", (unsigned long)(hpet->address).address);
+    cprintf("address_structure:\n");
+    cprintf("address_space_id = %08x\n", (hpet->address).address_space_id);
+    cprintf("register_bit_width = %08x\n", (hpet->address).register_bit_width);
+    cprintf("register_bit_offset = %08x\n", (hpet->address).register_bit_offset);
+    cprintf("address = %08lx\n", (unsigned long)(hpet->address).address);
 }
 
 static volatile HPETRegister *hpetReg;
@@ -200,52 +203,47 @@ static uint64_t hpetFemto = 0;
 /* HPET timer frequency */
 static uint64_t hpetFreq = 0;
 
-#define HPET_LEG_RT_CAP (1 << 15)
-#define HPET_LEG_RT_CNF (1 << 1)
-#define HPET_ENABLE_CNF (1 << 0)
-
 /* HPET timer initialisation */
 void
 hpet_init() {
-  if (hpetReg == NULL) {
-    nmi_disable();
-    hpetReg   = hpet_register();
-    uint64_t cap = hpetReg->GCAP_ID;
-    hpetFemto = (uintptr_t)(cap >> 32);
-    if (!(cap & HPET_LEG_RT_CAP)) panic("HPET has no LegacyReplacement mode");
+    if (hpetReg == NULL) {
+        nmi_disable();
+        hpetReg   = hpet_register();
+        uint64_t cap = hpetReg->GCAP_ID;
+        hpetFemto = (uintptr_t)(cap >> 32);
+        if (!(cap & HPET_LEG_RT_CAP)) panic("HPET has no LegacyReplacement mode");
 
-    /* cprintf("hpetFemto = %llu\n", hpetFemto); */
-    hpetFreq = (1 * Peta) / hpetFemto;
-    /* cprintf("HPET: Frequency = %d.%03dMHz\n", (uintptr_t)(hpetFreq / Mega), (uintptr_t)(hpetFreq % Mega)); */
-    /* Enable ENABLE_CNF bit to enable timer */
-    hpetReg->GEN_CONF |= HPET_ENABLE_CNF;
-    nmi_enable();
-
-  }
+        /* cprintf("hpetFemto = %llu\n", hpetFemto); */
+        hpetFreq = (1 * Peta) / hpetFemto;
+        /* cprintf("HPET: Frequency = %d.%03dMHz\n", (uintptr_t)(hpetFreq / Mega), (uintptr_t)(hpetFreq % Mega)); */
+        /* Enable ENABLE_CNF bit to enable timer */
+        hpetReg->GEN_CONF |= HPET_ENABLE_CNF;
+        nmi_enable();
+      }
 }
 
 /* HPET register contents debugging. */
 void
 hpet_print_reg(void) {
-  cprintf("GCAP_ID = %016lx\n", (unsigned long)hpetReg->GCAP_ID);
-  cprintf("GEN_CONF = %016lx\n", (unsigned long)hpetReg->GEN_CONF);
-  cprintf("GINTR_STA = %016lx\n", (unsigned long)hpetReg->GINTR_STA);
-  cprintf("MAIN_CNT = %016lx\n", (unsigned long)hpetReg->MAIN_CNT);
-  cprintf("TIM0_CONF = %016lx\n", (unsigned long)hpetReg->TIM0_CONF);
-  cprintf("TIM0_COMP = %016lx\n", (unsigned long)hpetReg->TIM0_COMP);
-  cprintf("TIM0_FSB = %016lx\n", (unsigned long)hpetReg->TIM0_FSB);
-  cprintf("TIM1_CONF = %016lx\n", (unsigned long)hpetReg->TIM1_CONF);
-  cprintf("TIM1_COMP = %016lx\n", (unsigned long)hpetReg->TIM1_COMP);
-  cprintf("TIM1_FSB = %016lx\n", (unsigned long)hpetReg->TIM1_FSB);
-  cprintf("TIM2_CONF = %016lx\n", (unsigned long)hpetReg->TIM2_CONF);
-  cprintf("TIM2_COMP = %016lx\n", (unsigned long)hpetReg->TIM2_COMP);
-  cprintf("TIM2_FSB = %016lx\n", (unsigned long)hpetReg->TIM2_FSB);
+    cprintf("GCAP_ID = %016lx\n", (unsigned long)hpetReg->GCAP_ID);
+    cprintf("GEN_CONF = %016lx\n", (unsigned long)hpetReg->GEN_CONF);
+    cprintf("GINTR_STA = %016lx\n", (unsigned long)hpetReg->GINTR_STA);
+    cprintf("MAIN_CNT = %016lx\n", (unsigned long)hpetReg->MAIN_CNT);
+    cprintf("TIM0_CONF = %016lx\n", (unsigned long)hpetReg->TIM0_CONF);
+    cprintf("TIM0_COMP = %016lx\n", (unsigned long)hpetReg->TIM0_COMP);
+    cprintf("TIM0_FSB = %016lx\n", (unsigned long)hpetReg->TIM0_FSB);
+    cprintf("TIM1_CONF = %016lx\n", (unsigned long)hpetReg->TIM1_CONF);
+    cprintf("TIM1_COMP = %016lx\n", (unsigned long)hpetReg->TIM1_COMP);
+    cprintf("TIM1_FSB = %016lx\n", (unsigned long)hpetReg->TIM1_FSB);
+    cprintf("TIM2_CONF = %016lx\n", (unsigned long)hpetReg->TIM2_CONF);
+    cprintf("TIM2_COMP = %016lx\n", (unsigned long)hpetReg->TIM2_COMP);
+    cprintf("TIM2_FSB = %016lx\n", (unsigned long)hpetReg->TIM2_FSB);
 }
 
 /* HPET main timer counter value. */
 uint64_t
 hpet_get_main_cnt(void) {
-  return hpetReg->MAIN_CNT;
+    return hpetReg->MAIN_CNT;
 }
 
 /* - Configure HPET timer 0 to trigger every 0.5 seconds on IRQ_TIMER line
@@ -253,123 +251,116 @@ hpet_get_main_cnt(void) {
  *
  * HINT To be able to use HPET as PIT replacement consult
  *      LegacyReplacement functionality in HPET spec. */
-// LAB 5: Your code here:
-
-#define HPET_TN_TYPE_CNF (1 << 3)
-#define HPET_TN_INT_ENB_CNF (1 << 2)
-#define HPET_TN_VAL_SET_CNF (1 << 6)
-#define HPET_TN_SIZE_CAP (1 << 5)
-#define HPET_TN_PER_INT_CAP (1 << 4)
-
 void
 hpet_enable_interrupts_tim0(void) {
-  hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
+    // LAB 5: Your code here
 
-  uint64_t cap = hpetReg->TIM0_CONF;
-  if (!(cap & HPET_TN_SIZE_CAP))
-    panic("HPET timer 0 does not support 64-bit mode");
-  if (!(cap & HPET_TN_PER_INT_CAP))
-    panic("HPET timer 0 does not support periodic mode");
+    hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
 
-  hpetReg->TIM0_CONF = (IRQ_TIMER << 9) | HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF | HPET_TN_VAL_SET_CNF;
-  hpetReg->TIM0_COMP = hpet_get_main_cnt() + Peta/2/hpetFemto;
-  hpetReg->TIM0_COMP = Peta/2/hpetFemto;
+    uint64_t cap = hpetReg->TIM0_CONF;
+    if (!(cap & HPET_TN_SIZE_CAP))
+        panic("HPET timer 0 does not support 64-bit mode");
+    if (!(cap & HPET_TN_PER_INT_CAP))
+        panic("HPET timer 0 does not support periodic mode");
 
-  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_TIMER));
+    hpetReg->TIM0_CONF = (IRQ_TIMER << 9) | HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF | HPET_TN_VAL_SET_CNF;
+    hpetReg->TIM0_COMP = hpet_get_main_cnt() + Peta/2/hpetFemto;
+    hpetReg->TIM0_COMP = Peta/2/hpetFemto;
+
+    irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_TIMER));
 }
 
 void
 hpet_enable_interrupts_tim1(void) {
-  hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
+    hpetReg->GEN_CONF |= HPET_LEG_RT_CNF;
 
-  uint64_t cap = hpetReg->TIM1_CONF;
-  if (!(cap & HPET_TN_SIZE_CAP))
-    panic("HPET timer 0 does not support 64-bit mode");
-  if (!(cap & HPET_TN_PER_INT_CAP))
-    panic("HPET timer 0 does not support periodic mode");
+    uint64_t cap = hpetReg->TIM1_CONF;
+    if (!(cap & HPET_TN_SIZE_CAP))
+        panic("HPET timer 0 does not support 64-bit mode");
+    if (!(cap & HPET_TN_PER_INT_CAP))
+        panic("HPET timer 0 does not support periodic mode");
 
-  hpetReg->TIM1_CONF = (IRQ_CLOCK << 9) | HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF | HPET_TN_VAL_SET_CNF;
-  hpetReg->TIM1_COMP = hpet_get_main_cnt() + 3*Peta/2/hpetFemto;
-  hpetReg->TIM1_COMP = 3*Peta/2/hpetFemto;
+    hpetReg->TIM1_CONF = (IRQ_CLOCK << 9) | HPET_TN_TYPE_CNF | HPET_TN_INT_ENB_CNF | HPET_TN_VAL_SET_CNF;
+    hpetReg->TIM1_COMP = hpet_get_main_cnt() + 3*Peta/2/hpetFemto;
+    hpetReg->TIM1_COMP = 3*Peta/2/hpetFemto;
 
-  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
+    irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
 }
 
 void
 hpet_handle_interrupts_tim0(void) {
-  pic_send_eoi(IRQ_TIMER);
+    pic_send_eoi(IRQ_TIMER);
 }
 
 void
 hpet_handle_interrupts_tim1(void) {
-  pic_send_eoi(IRQ_CLOCK);
+    pic_send_eoi(IRQ_CLOCK);
 }
 
 /* Calculate CPU frequency in Hz with the help with HPET timer.
  * HINT Use hpet_get_main_cnt function and do not forget about
  * about pause instruction. */
-
-// LAB 5: Your code here:
 uint64_t
 hpet_cpu_frequency(void) {
-  static uint64_t cpu_freq;
+    static uint64_t cpu_freq;
 
-  if (!cpu_freq) {
-    uint64_t time_res = 100;
-    uint64_t delta = 0, target = hpetFreq / time_res;
+    // LAB 5: Your code here
 
-    uint64_t tick0 = hpet_get_main_cnt();
-    uint64_t tsc0 = read_tsc();
-    do {
-      asm("pause");
-      delta = hpet_get_main_cnt() - tick0;
-    } while (delta < target);
+    if (!cpu_freq) {
+        uint64_t time_res = 100;
+        uint64_t delta = 0, target = hpetFreq / time_res;
 
-    uint64_t tsc1 = read_tsc();
-    cpu_freq = (tsc1 - tsc0) * time_res;
-  }
+        uint64_t tick0 = hpet_get_main_cnt();
+        uint64_t tsc0 = read_tsc();
+        do {
+            asm("pause");
+            delta = hpet_get_main_cnt() - tick0;
+        } while (delta < target);
 
-  return cpu_freq;
+        uint64_t tsc1 = read_tsc();
+        cpu_freq = (tsc1 - tsc0) * time_res;
+    }
+
+    return cpu_freq;
 }
 
 uint32_t
 pmtimer_get_timeval(void) {
-  FADT *fadt = get_fadt();
-  return inl(fadt->PMTimerBlock);
+    FADT *fadt = get_fadt();
+    return inl(fadt->PMTimerBlock);
 }
-
-#define PM_FREQ 3579545
 
 /* Calculate CPU frequency in Hz with the help with ACPI PowerManagement timer.
  * HINT Use pmtimer_get_timeval function and do not forget that ACPI PM timer
  *      can be 24-bit or 32-bit. */
-// LAB 5: Your code here:
 uint64_t
 pmtimer_cpu_frequency(void) {
-  static uint64_t cpu_freq;
+    static uint64_t cpu_freq;
 
-  if (!cpu_freq) {
-    uint32_t time_res = 100;
-    uint32_t tick0 = pmtimer_get_timeval();
-    uint64_t delta = 0, target = PM_FREQ / time_res;
+    // LAB 5: Your code here
 
-    uint64_t tsc0 = read_tsc();
+    if (!cpu_freq) {
+        uint32_t time_res = 100;
+        uint32_t tick0 = pmtimer_get_timeval();
+        uint64_t delta = 0, target = PM_FREQ / time_res;
 
-    do {
-      asm("pause");
-      uint32_t tick1 = pmtimer_get_timeval();
-      delta = tick1 - tick0;
-      if (-delta <= 0xFFFFFF) {
-        delta += 0xFFFFFF;
-      } else if (tick0 > tick1) {
-        delta += 0xFFFFFFFF;
-      }
-    } while (delta < target);
+        uint64_t tsc0 = read_tsc();
 
-    uint64_t tsc1 = read_tsc();
+        do {
+            asm("pause");
+            uint32_t tick1 = pmtimer_get_timeval();
+            delta = tick1 - tick0;
+            if (-delta <= 0xFFFFFF) {
+                delta += 0xFFFFFF;
+            } else if (tick0 > tick1) {
+                delta += 0xFFFFFFFF;
+            }
+        } while (delta < target);
 
-    cpu_freq = (tsc1 - tsc0) * PM_FREQ / delta;
-  }
+        uint64_t tsc1 = read_tsc();
 
-  return cpu_freq;
+        cpu_freq = (tsc1 - tsc0) * PM_FREQ / delta;
+    }
+
+    return cpu_freq;
 }

@@ -151,20 +151,20 @@ mon_pagedump(int argc, char **argv, struct Trapframe *tf) {
   pml4e_t *pml4 = kern_pml4e;
   cprintf("CR3 %016lX\n", kern_cr3);
   cprintf("PML4 %p\n", kern_pml4e);
-  for (size_t i = 0; i < NPMLENTRIES; i++) {
+  for (size_t i = 0; i < PML4_ENTRY_COUNT; i++) {
     if (pml4[i] & PTE_P) {
       cprintf("|-[%03lu] = %016lX\n", i, pml4[i]);
       pdpe_t *pdpe = KADDR(PTE_ADDR(pml4[i]));
-      for (size_t i = 0; i < NPDPENTRIES; i++) {
+      for (size_t i = 0; i < PDP_ENTRY_COUNT; i++) {
         if (pdpe[i] & PTE_P) {
           cprintf("   |-[%03lu] = %016lX\n", i, pdpe[i]);
           pde_t *pde = KADDR(PTE_ADDR(pdpe[i]));
-          for (size_t i = 0; i < NPDENTRIES; i++) {
+          for (size_t i = 0; i < PD_ENTRY_COUNT; i++) {
             if (pde[i] & PTE_P) {
               cprintf("      |-[%03lu] = %016lX\n", i, pde[i]);
 #if 0 // Slow
               pte_t *pte = KADDR(PTE_ADDR(pde[i]));
-              for (size_t i = 0; i < NPDPENTRIES; i++) {
+              for (size_t i = 0; i < PT_ENTRY_COUNT; i++) {
                 if (pte[i] & PTE_P) {
                     cprintf("         |-[%03lu] = %016lX\n", i, pte[i]);
                 }

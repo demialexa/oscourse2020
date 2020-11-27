@@ -101,7 +101,7 @@ sys_exit:
 
 
 # Allocate boot stack forcing page alignment.
-.p2align PGSHIFT
+.p2align PAGE_SHIFT
 .globl bootstack
 bootstack:
   .space KSTKSIZE

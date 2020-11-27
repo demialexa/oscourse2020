@@ -62,7 +62,7 @@ sys_page_alloc(envid_t envid, void *va, int perm) {
     int res = syscall(SYS_page_alloc, 1, envid, (uintptr_t)va, perm, 0, 0);
 #ifdef SANITIZE_USER_SHADOW_BASE
     /* Unpoison the allocated page */
-    if (!res) platform_asan_unpoison(ROUNDDOWN(va, PGSIZE), PGSIZE);
+    if (!res) platform_asan_unpoison(ROUNDDOWN(va, PAGE_SIZE), PAGE_SIZE);
 #endif
 
     return res;

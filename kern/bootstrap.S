@@ -3,13 +3,13 @@
 
 .code64
 
-# Normal x86-64 4-level translation looks like CR3->PML4->PDPE->PDE->PTE
+# Normal x86-64 4-level translation looks like CR3->PML4->PDP->PD->PT
 # We set the PTE_MBZ bits in PDE (pgdir) to skip the last step
 .set pml4,   pml4phys
-.set pdpt1,  pml4 + PGSIZE
-.set pdpt2,  pml4 + 2*PGSIZE
-.set pde1,   pml4 + 3*PGSIZE
-.set pde2,   pml4 + 4*PGSIZE
+.set pdpt1,  pml4 + PAGE_SIZE
+.set pdpt2,  pml4 + 2*PAGE_SIZE
+.set pde1,   pml4 + 3*PAGE_SIZE
+.set pde2,   pml4 + 4*PAGE_SIZE
 
 # Should be less than 4096/8 * 11
 #define PML_SIZE 5632
@@ -54,14 +54,14 @@ _head64:
 
   # Setting the pgdir so that the LA=PA
   # Mapping first 1024mb of mem at KERNBASE
-  movq $-NPDPENTRIES, %rcx
+  movq $-PDP_ENTRY_COUNT, %rcx
   movq $pde1, %rdi
   movq $pde2, %rsi
   movl $(PTE_P|PTE_W|PTE_MBZ), %eax
 1:
-  movq %rax, PGSIZE(%rsi,%rcx,8)
-  movq %rax, PGSIZE(%rdi,%rcx,8)
-  addq $PTSIZE, %rax
+  movq %rax, PAGE_SIZE(%rsi,%rcx,8)
+  movq %rax, PAGE_SIZE(%rdi,%rcx,8)
+  addq $HUGE_PAGE_SIZE, %rax
   incq %rcx
   jnz 1b
 
@@ -76,13 +76,13 @@ _head64:
 
 .data
 
-.p2align PGSHIFT
+.p2align PAGE_SHIFT
 .globl pml4phys
 pml4phys:
-  .space 11*PGSIZE
+  .space 11*PAGE_SIZE
 
 .globl pdefreestart
-.set pdefreestart, pde2 + PGSIZE
+.set pdefreestart, pde2 + PAGE_SIZE
 
 .globl pdefreeend
-.set pdefreeend, pml4phys + 11*PGSIZE
+.set pdefreeend, pml4phys + 11*PAGE_SIZE

@@ -66,15 +66,12 @@ int sys_page_unmap(envid_t env, void *pg);
 int sys_ipc_try_send(envid_t to_env, uint64_t value, void *pg, int perm);
 int sys_ipc_recv(void *rcv_pg);
 
-/* This must be inlined.  Exercise for reader: why? */
-static __inline envid_t __attribute__((always_inline))
+/* This must be inlined. Exercise for reader: why? */
+static inline envid_t __attribute__((always_inline))
 sys_exofork(void) {
-  envid_t ret;
-  __asm __volatile("int %2"
-                   : "=a"(ret)
-                   : "a"(SYS_exofork),
-                     "i"(T_SYSCALL));
-  return ret;
+    envid_t ret;
+    asm volatile("int %2" : "=a"(ret) : "a"(SYS_exofork), "i"(T_SYSCALL));
+    return ret;
 }
 
 /* ipc.c */
@@ -84,8 +81,9 @@ envid_t ipc_find_env(enum EnvType type);
 
 /* fork.c */
 #define PTE_SHARE 0x400
+#define PTE_UWP (PTE_P | PTE_U| PTE_W)
 envid_t fork(void);
-envid_t sfork(void); /* Challenge! */
+envid_t sfork(void);
 
 /* fd.c */
 int close(int fd);
@@ -106,6 +104,7 @@ int sync(void);
 
 /* pageref.c */
 int pageref(void *addr);
+pte_t get_uvpt_entry(void *addr);
 
 /* spawn.c */
 envid_t spawn(const char *program, const char **argv);

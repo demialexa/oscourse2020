@@ -47,7 +47,7 @@ serve_init(void) {
   for (i = 0; i < MAXOPEN; i++) {
     opentab[i].o_fileid = i;
     opentab[i].o_fd     = (struct Fd *)va;
-    va += PGSIZE;
+    va += PAGE_SIZE;
   }
 }
 
@@ -66,7 +66,7 @@ openfile_alloc(struct OpenFile **o) {
       case 1:
         opentab[i].o_fileid += MAXOPEN;
         *o = &opentab[i];
-        memset(opentab[i].o_fd, 0, PGSIZE);
+        memset(opentab[i].o_fd, 0, PAGE_SIZE);
         return (*o)->o_fileid;
     }
   }
@@ -301,7 +301,7 @@ serve(void) {
     req  = ipc_recv((int32_t *)&whom, fsreq, &perm);
     if (debug)
       cprintf("fs req %d from %08x [page %08lx: %s]\n",
-              req, whom, (unsigned long)uvpt[PGNUM(fsreq)],
+              req, whom, (unsigned long)uvpt[VPT(fsreq)],
               (char *)fsreq);
 
     /* All requests must contain an argument page */

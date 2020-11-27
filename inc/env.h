@@ -61,7 +61,7 @@ struct Env {
   uint8_t *binary;         /* Pointer to process ELF image in kernel memory */
 
   /* Address space */
-  pml4e_t *env_pml4e;      /* Kernel virtual address of page dir */
+  pml4e_t *env_pagetable;      /* Kernel virtual address of page dir */
   physaddr_t env_cr3;
 
   // Exception handling

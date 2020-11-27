@@ -23,7 +23,7 @@ int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store) {
     // LAB 9: Your code here:
 
-    int res = sys_ipc_recv(pg ? pg : (void *)(UTOP + PGSIZE));
+    int res = sys_ipc_recv(pg ? pg : (void *)-1);
     if (res < 0) {
         if (from_env_store)
             *from_env_store = 0;
@@ -53,7 +53,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm) {
 
     int res;
     do {
-        res = sys_ipc_try_send(to_env, val, pg ? pg : (void *)-1U, perm);
+        res = sys_ipc_try_send(to_env, val, pg ? pg : (void *)-1, perm);
         if (res == -E_IPC_NOT_RECV) sys_yield();
     } while (res == -E_IPC_NOT_RECV);
 

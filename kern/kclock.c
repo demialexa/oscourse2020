@@ -6,9 +6,25 @@
 #include <kern/trap.h>
 #include <kern/picirq.h>
 
-static void
-rtc_timer_init(void) {
-  rtc_init();
+uint8_t
+cmos_read8(uint8_t reg) {
+  /* MC146818A controller */
+  outb(CMOS_CMD, reg | CMOS_NMI_LOCK);
+  uint8_t res = inb(CMOS_DATA);
+  nmi_enable();
+  return res;
+}
+
+void
+cmos_write8(uint8_t reg, uint8_t value) {
+    outb(CMOS_CMD, reg | CMOS_NMI_LOCK);
+    outb(CMOS_DATA, value);
+    nmi_enable();
+}
+
+uint16_t
+cmos_read16(uint8_t reg) {
+    return cmos_read8(reg) | (cmos_read8(reg + 1) << 8);
 }
 
 static void
@@ -30,47 +46,20 @@ struct Timer timer_rtc = {
 };
 
 void
-rtc_init(void) {
-  nmi_disable();
-
+rtc_timer_init(void) {
   // LAB 4: Your code here:
 
-  outb(IO_RTC_CMND, RTC_AREG);
-  uint8_t rga = inb(IO_RTC_DATA);
-  outb(IO_RTC_CMND, RTC_AREG);
-  outb(IO_RTC_DATA, SET_NEW_RATE(rga, RTC_500MS_RATE));
+  uint8_t rga = cmos_read8(RTC_AREG);
+  cmos_write8(RTC_AREG, RTC_SET_NEW_RATE(rga, RTC_500MS_RATE));
 
-  outb(IO_RTC_CMND, RTC_BREG);
-  uint8_t rgb = inb(IO_RTC_DATA);
-  outb(IO_RTC_CMND, RTC_BREG);
-  outb(IO_RTC_DATA, rgb | RTC_PIE);
-
-  nmi_enable();
+  uint8_t rgb = cmos_read8(RTC_BREG);
+  cmos_write8(RTC_BREG, rgb | RTC_PIE);
 }
 
 uint8_t
 rtc_check_status(void) {
   // LAB 4: Your code here:
 
-  outb(IO_RTC_CMND, RTC_CREG);
-  uint8_t status = inb(IO_RTC_DATA);
-
-  return status;
+  return cmos_read8(RTC_CREG);
 }
 
-unsigned
-mc146818_read(unsigned reg) {
-  outb(IO_RTC_CMND, reg);
-  return inb(IO_RTC_DATA);
-}
-
-void
-mc146818_write(unsigned reg, unsigned datum) {
-  outb(IO_RTC_CMND, reg);
-  outb(IO_RTC_DATA, datum);
-}
-
-unsigned
-mc146818_read16(unsigned reg) {
-  return mc146818_read(reg) | (mc146818_read(reg + 1) << 8);
-}

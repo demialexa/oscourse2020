@@ -11,7 +11,7 @@
 extern struct Env *envs;
 /* Currently active environment */
 extern struct Env *curenv;
-extern struct Segdesc gdt[];
+extern struct Segdesc32 gdt[];
 
 void env_init(void);
 int env_alloc(struct Env **e, envid_t parent_id, enum EnvType type);

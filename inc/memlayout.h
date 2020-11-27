@@ -40,20 +40,20 @@
  *                     |      Invalid Memory (*)      | --/--  KSTKGAP    |
  *                     +------------------------------+                   |
  *                     |     CPU1's Kernel Stack      | RW/--  KSTKSIZE   |
- *                     | - - - - - - - - - - - - - - -|                 PTSIZE
+ *                     | - - - - - - - - - - - - - - -|                 HUGE_PAGE_SIZE
  *                     |      Invalid Memory (*)      | --/--  KSTKGAP    |
  *                     +------------------------------+                   |
  *                     :              .               :                   |
  *                     :              .               :                   |
  *    MMIOLIM ------>  +------------------------------+ 0x803fe00000    --+
- *                     |       Memory-mapped I/O      | RW/--  PTSIZE
+ *                     |       Memory-mapped I/O      | RW/--  HUGE_PAGE_SIZE
  * ULIM, MMIOBASE -->  +------------------------------+ 0x803fc00000
  *                     |          RO PAGES            | R-/R-
  *                     .                              .
- *                     .                              .        400 * PTSIZE
+ *                     .                              .        400 * HUGE_PAGE_SIZE
  *                     .                              .
  *    UPAGES    ---->  +------------------------------+ 0x8000dc0000
- *                     |           RO ENVS            | R-/R-  PTSIZE
+ *                     |           RO ENVS            | R-/R-  HUGE_PAGE_SIZE
  * UENVS ----------->  +------------------------------+ 0x8000da0000
  *                     |                              |
  *                     |                              |
@@ -62,11 +62,11 @@
  *                     .                              .
  * UTOP,               .                              .
  * UXSTACKTOP ------>  +------------------------------+ 0x8000000000
- *                     |     User Exception Stack     | RW/RW  PGSIZE
+ *                     |     User Exception Stack     | RW/RW  PAGE_SIZE
  *                     +------------------------------+ 0x7ffffff000
- *                     |       Empty Memory (*)       | --/--  PGSIZE
+ *                     |       Empty Memory (*)       | --/--  PAGE_SIZE
  *    USTACKTOP  --->  +------------------------------+ 0x7fffffe000
- *                     |      Normal User Stack       | RW/RW  PGSIZE
+ *                     |      Normal User Stack       | RW/RW  PAGE_SIZE
  *                     +------------------------------+ 0x7fffffd000
  *                     |                              |
  *                     |                              |
@@ -77,12 +77,12 @@
  *                     |~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|
  *                     |     Program Data & Heap      |
  *    UTEXT -------->  +------------------------------+ 0x00800000
- *    PFTEMP ------->  |       Empty Memory (*)       |        2* PTSIZE
+ *    PFTEMP ------->  |       Empty Memory (*)       |        2* HUGE_PAGE_SIZE
  *                     |                              |
  *    UTEMP -------->  +------------------------------+ 0x00400000      --+
  *                     |       Empty Memory (*)       |                   |
  *                     | - - - - - - - - - - - - - - -|                   |
- *                     |  User STAB Data (optional)   |                2* PTSIZE
+ *                     |  User STAB Data (optional)   |                2* HUGE_PAGE_SIZE
  *    USTABDATA ---->  +------------------------------+ 0x00200000        |
  *                     |       Empty Memory (*)       |                   |
  *    0 ------------>  +------------------------------+                 --+
@@ -107,13 +107,13 @@
 
 /* Kernel stack */
 #define KSTACKTOP KERNBASE
-#define PSTKSIZE  (2 * PGSIZE)  /* size of a process stack */
-#define KSTKSIZE  (16 * PGSIZE) /* size of a kernel stack */
-#define KSTKGAP   (8 * PGSIZE)  /* size of a kernel stack guard */
+#define PSTKSIZE  (2 * PAGE_SIZE)  /* size of a process stack */
+#define KSTKSIZE  (16 * PAGE_SIZE) /* size of a kernel stack */
+#define KSTKGAP   (8 * PAGE_SIZE)  /* size of a kernel stack guard */
 
 /* Memory-mapped IO */
-#define MMIOLIM  (KSTACKTOP - PTSIZE)
-#define MMIOBASE (MMIOLIM - PTSIZE)
+#define MMIOLIM  (KSTACKTOP - HUGE_PAGE_SIZE)
+#define MMIOBASE (MMIOLIM - HUGE_PAGE_SIZE)
 
 /* Memory-mapped FrameBuffer */
 #define FBUFFBASE (MMIOBASE - FBUFF_SIZE)
@@ -125,21 +125,23 @@
  * They are global pages mapped in at env allocation time.
  */
 
+#define UVPML4_SIZE PAGE_SIZE
+#define UVPDP_SIZE  (2*PAGE_SIZE)
+#define UVPD_SIZE   (PD_ENTRY_COUNT*UVPDP_SIZE)
+#define UVPT_SIZE   (PT_ENTRY_COUNT*UVPD_SIZE)
+
 /* User read-only virtual page table (see 'uvpt' below) */
 #define UVPT   0x10000000000
-#define UVPD   UVPT + UVPTSIZE
-#define UVPDE  UVPD + UVPDSIZE
-#define UVPML4 UVPDE + UVPDESIZE
+#define UVPD   (UVPT + UVPT_SIZE)
+#define UVPDP  (UVPD + UVPD_SIZE)
+#define UVPML4 (UVPDP + UVPDP_SIZE)
 
-#define UVPTSIZE   0x80000000
-#define UVPDSIZE   0x400000
-#define UVPDESIZE  0x2000
-#define UVPML4SIZE PGSIZE
-/* Read-only copies of the Page structures (sizeof == 400 * PTSIZE so that all
+/* Read-only copies of the Page structures (sizeof == 400 * HUGE_PAGE_SIZE so that all
  * struct PageInfo of up to 512GiB pages can fit here). */
 #define UPAGES (ULIM - UPAGES_SIZE)
+
 /* Read-only copies of the global env structures */
-#define UENVS (UPAGES - PTSIZE)
+#define UENVS (UPAGES - HUGE_PAGE_SIZE)
 
 /*
  * Top of user VM. User can manipulate VA from UTOP-1 and down!
@@ -150,12 +152,12 @@
 /* Top of one-page user exception stack */
 #define UXSTACKTOP UTOP
 /* Size of exception stack (must be one page for now) */
-#define UXSTACKSIZE (4 * PGSIZE)
+#define UXSTACKSIZE (4 * PAGE_SIZE)
 /* Top of normal user stack */
 /* Next page left invalid to guard against exception stack overflow; then: */
-#define USTACKTOP (UXSTACKTOP - UXSTACKSIZE - PGSIZE)
+#define USTACKTOP (UXSTACKTOP - UXSTACKSIZE - PAGE_SIZE)
 /* Stack size (variable) */
-#define USTACKSIZE (4 * PGSIZE)
+#define USTACKSIZE (4 * PAGE_SIZE)
 // Max number of open files in the file system at once
 #define MAXOPEN 512
 #define FILEVA  0xD0000000
@@ -163,31 +165,31 @@
 #ifdef SANITIZE_USER_SHADOW_OFF
 /* User stack and some other tables are located at higher addresses,
  * so we need to map a separate shadow for it. */
-#define SANITIZE_USER_EXTRA_SHADOW_BASE (((UENVS >> 3) + SANITIZE_USER_SHADOW_OFF) & ~(PGSIZE - 1))
+#define SANITIZE_USER_EXTRA_SHADOW_BASE (((UENVS >> 3) + SANITIZE_USER_SHADOW_OFF) & ~(PAGE_SIZE - 1))
 #define SANITIZE_USER_EXTRA_SHADOW_SIZE ((ULIM - UENVS) >> 3)
 
-#define SANITIZE_USER_STACK_SHADOW_BASE ((((USTACKTOP - USTACKSIZE) >> 3) + SANITIZE_USER_SHADOW_OFF) & ~(PGSIZE - 1))
-#define SANITIZE_USER_STACK_SHADOW_SIZE ((USTACKSIZE + UXSTACKSIZE + PGSIZE) >> 3)
+#define SANITIZE_USER_STACK_SHADOW_BASE ((((USTACKTOP - USTACKSIZE) >> 3) + SANITIZE_USER_SHADOW_OFF) & ~(PAGE_SIZE - 1))
+#define SANITIZE_USER_STACK_SHADOW_SIZE ((USTACKSIZE + UXSTACKSIZE + PAGE_SIZE) >> 3)
 
 /* File system is located at another specific address space */
 #define SANITIZE_USER_FS_SHADOW_BASE ((FILEVA >> 3) + SANITIZE_USER_SHADOW_OFF)
-#define SANITIZE_USER_FS_SHADOW_SIZE ((((MAXOPEN * PGSIZE) >> 3) + (PGSIZE - 1)) & ~(PGSIZE - 1))
+#define SANITIZE_USER_FS_SHADOW_SIZE ((((MAXOPEN * PAGE_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
 
 /* UVPT is located at another specific address space */
 #define SANITIZE_USER_VPT_SHADOW_BASE ((UVPT >> 3) + SANITIZE_USER_SHADOW_OFF)
-#define SANITIZE_USER_VPT_SHADOW_SIZE ((((UVPTSIZE + UVPDSIZE + UVPDESIZE + UVPML4SIZE) >> 3) + (PGSIZE - 1)) & ~(PGSIZE - 1))
+#define SANITIZE_USER_VPT_SHADOW_SIZE ((((UVPT_SIZE + UVPD_SIZE + UVPDP_SIZE + UVPML4_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
 #endif
 
 /* Where user programs generally begin */
-#define UTEXT (4 * PTSIZE)
+#define UTEXT (4 * HUGE_PAGE_SIZE)
 
 /* Used for temporary page mappings.  Typed 'void*' for convenience */
-#define UTEMP ((void *)(2 * PTSIZE))
+#define UTEMP ((void *)(2 * HUGE_PAGE_SIZE))
 /* Used for temporary page mappings for the user page-fault handler
  * (should not conflict with other temporary page mappings) */
-#define PFTEMP (UTEMP + PTSIZE - PGSIZE)
+#define PFTEMP (UTEMP + HUGE_PAGE_SIZE - PAGE_SIZE)
 /* The location of the user-level STABS data structure */
-#define USTABDATA (PTSIZE)
+#define USTABDATA (HUGE_PAGE_SIZE)
 
 #ifndef __ASSEMBLER__
 
@@ -196,10 +198,10 @@ typedef uint64_t pdpe_t;
 typedef uint64_t pde_t;
 typedef uint64_t pte_t;
 
-#if JOS_USER
+#ifndef JOS_PROG
 /*
  * The page directory entry corresponding to the virtual address range
- * [UVPT, UVPT + PTSIZE) points to the page directory itself.  Thus, the page
+ * [UVPT, UVPT + HUGE_PAGE_SIZE) points to the page directory itself.  Thus, the page
  * directory is treated as a page table as well as a page directory.
  *
  * One result of treating the page directory as a page table is that all PTEs
@@ -213,8 +215,8 @@ typedef uint64_t pte_t;
  */
 extern volatile pte_t uvpt[];      /* VA of "virtual page table" */
 extern volatile pde_t uvpd[];      /* VA of current page directory */
-extern volatile pdpe_t uvpde[];    /* VA of current page directory pointer */
-extern volatile pml4e_t uvpml4e[]; /* VA of current page map level 4 */
+extern volatile pdpe_t uvpdp[];    /* VA of current page directory pointer */
+extern volatile pml4e_t uvpml4[]; /* VA of current page map level 4 */
 #endif
 
 /*

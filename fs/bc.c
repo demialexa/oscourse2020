@@ -16,14 +16,13 @@ diskaddr(uint32_t blockno) {
 /* Is this virtual address mapped? */
 bool
 va_is_mapped(void *va) {
-  return ((uvpml4e[PML4(va)] & PTE_P) && (uvpde[VPDPE(va)] & PTE_P) &&
-          (uvpd[VPD(va)] & PTE_P) && (uvpt[PGNUM(va)] & PTE_P));
+  return get_uvpt_entry(va) & PTE_P;
 }
 
 /* Is this virtual address dirty? */
 bool
 va_is_dirty(void *va) {
-  return (uvpt[PGNUM(va)] & PTE_D) != 0;
+  return (uvpt[VPT(va)] & PTE_D) != 0;
 }
 
 /* Fault any disk block that is read in to memory by
@@ -48,13 +47,13 @@ bc_pgfault(struct UTrapframe *utf) {
    * the disk. */
   // LAB 10: Your code here.
 
-  addr = ROUNDDOWN(addr, PGSIZE);
+  addr = ROUNDDOWN(addr, PAGE_SIZE);
   int res;
 
   res = sys_page_alloc(0, addr, PTE_U | PTE_W | PTE_P);
   if (res < 0) panic("sys_page_alloc(): %i", res);
   res = ide_read(blockno*BLKSECTS, addr, BLKSECTS);
-  if (res < 0) panic("cannot read sects [%d-%d] from disk", blockno, blockno + PGSIZE/SECTSIZE);
+  if (res < 0) panic("cannot read sects [%d-%d] from disk", blockno, (int)(blockno + PAGE_SIZE/SECTSIZE));
 }
 
 /* Flush the contents of the block containing VA out to disk if
@@ -75,12 +74,12 @@ flush_block(void *addr) {
     panic("reading non-existent block %08x out of %08x\n", blockno, super->s_nblocks);
 
   // LAB 10: Your code here.
-  addr = ROUNDDOWN(addr, PGSIZE);
+  addr = ROUNDDOWN(addr, PAGE_SIZE);
   if (!va_is_mapped(addr) || !va_is_dirty(addr)) return;
 
   res = ide_write(blockno*BLKSECTS, addr, BLKSECTS);
-  if (res < 0) panic("cannot write sects [%d-%d] from disk", blockno, blockno + PGSIZE/SECTSIZE);
-  res = sys_page_map(0, addr, 0, addr, uvpt[(uintptr_t)addr/PGSIZE] & PTE_SYSCALL);
+  if (res < 0) panic("cannot write sects [%d-%d] from disk", blockno, (int)(blockno + PAGE_SIZE/SECTSIZE));
+  res = sys_page_map(0, addr, 0, addr, uvpt[(uintptr_t)addr/PAGE_SIZE] & PTE_SYSCALL);
   if (res < 0) panic("sys_page_map(): %i", res);
 }
 
