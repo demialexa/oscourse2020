@@ -24,40 +24,29 @@ SECTIONS
     *(EXCLUDE_FILE(*obj/kern/bootstrap.o) .text .stub .text.* .gnu.linkonce.t.*)
     . = ALIGN(8);
     __text_end = .;
-  }
 
-  PROVIDE(etext = .); /* Define the 'etext' symbol to this value */
+    PROVIDE(etext = .); /* Define the 'etext' symbol to this value */
 
-  .rodata : {
     __rodata_start = .;
     *(EXCLUDE_FILE(*obj/kern/bootstrap.o) .rodata .rodata.* .gnu.linkonce.r.* .data.rel.ro.local)
     . = ALIGN(8);
     __rodata_end = .;
   }
 
-
-  /* Adjust the address for the data segment to the next page */
-  . = ALIGN(0x1000);
-
   /* The data segment */
-  .data : {
+  /* Adjust the address for the data segment to the next page */
+  .data : ALIGN(0x1000) {
     __data_start = .;
-    *(EXCLUDE_FILE(obj/kern/bootstrap.o) .data .data.rel .data.rel.local .got .got.plt)
+    *(EXCLUDE_FILE(obj/kern/bootstrap.o) .data .got.plt .data.rel .data.rel.local .got)
     . = ALIGN(8);
     __data_end = .;
-  }
 
-  .ctors :
-  {
     __ctors_start = .;
     KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
     KEEP(* (.init_array .ctors))
     __ctors_end = .;
     . = ALIGN(8);
-  }
 
-  .dtors :
-  {
     __dtors_start = .;
     KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
     KEEP(*(.fini_array .dtors))
@@ -67,7 +56,7 @@ SECTIONS
 
   PROVIDE(edata = .);
 
-  .bss : {
+  .bss : ALIGN(0x1000) {
     __bss_start = .;
     *(EXCLUDE_FILE(obj/kern/bootstrap.o) .bss)
     *(COMMON)
@@ -79,6 +68,6 @@ SECTIONS
   PROVIDE(end = .);
 
   /DISCARD/ : {
-    *(.eh_frame .note.GNU-stack)
+    *(.interp .eh_frame .note.GNU-stack)
   }
 }

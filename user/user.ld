@@ -14,13 +14,11 @@ SECTIONS
 	.text : {
 		__text_start = .;
 		*(.text .stub .text.* .gnu.linkonce.t.*)
-		. = ALIGN(4);
+		. = ALIGN(8);
 		__text_end = .;
-	}
 
-	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
+        PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
 
-	.rodata : {
 		__rodata_start = .;
 		*(.rodata .rodata.* .gnu.linkonce.r.* .data.rel.ro.local)
 		. = ALIGN(0x1000);
@@ -31,19 +29,23 @@ SECTIONS
 		__data_start = .;
 		*(.data .data.rel.local)
 		__data_end = .;
+
 		__ctors_start = .;
 		KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
 		KEEP(*(.init_array .ctors))
 		__ctors_end = .;
-		. = ALIGN(4);
+		. = ALIGN(8);
+
 		__dtors_start = .;
 		KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
 		KEEP(*(.fini_array .dtors))
 		__dtors_end = .;
-		. = ALIGN(4);
+		. = ALIGN(8);
 	}
 
 	PROVIDE(edata = .);
+
+	. = ALIGN(0x1000);
 
 	.bss : {
 		__bss_start = .;
@@ -57,6 +59,6 @@ SECTIONS
 	PROVIDE(end = .);
 
 	/DISCARD/ : {
-		*(.eh_frame .note.GNU-stack .comment)
+		*(.interp .eh_frame .note.GNU-stack .comment)
 	}
 }
