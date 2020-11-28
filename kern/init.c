@@ -20,159 +20,158 @@
 
 void
 timers_init(void) {
-  timertab[0] = timer_rtc;
-  timertab[1] = timer_pit;
-  timertab[2] = timer_acpipm;
-  timertab[3] = timer_hpet0;
-  timertab[4] = timer_hpet1;
+    timertab[0] = timer_rtc;
+    timertab[1] = timer_pit;
+    timertab[2] = timer_acpipm;
+    timertab[3] = timer_hpet0;
+    timertab[4] = timer_hpet1;
 
-  for (int i = 0; i < MAX_TIMERS; i++) {
-    if (timertab[i].timer_init) {
-      timertab[i].timer_init();
+    for (int i = 0; i < MAX_TIMERS; i++) {
+        if (timertab[i].timer_init) {
+            timertab[i].timer_init();
+        }
     }
-  }
 }
 
 void
 timers_schedule(const char *name) {
-  for (int i = 0; i < MAX_TIMERS; i++) {
-    if (timertab[i].timer_name && !strcmp(timertab[i].timer_name, name)) {
-      if (!timertab[i].enable_interrupts) {
-        panic("Timer %s does not support interrupts\n", name);
-      }
+    for (int i = 0; i < MAX_TIMERS; i++) {
+        if (timertab[i].timer_name && !strcmp(timertab[i].timer_name, name)) {
+            if (!timertab[i].enable_interrupts) {
+                panic("Timer %s does not support interrupts\n", name);
+            }
 
-      timer_for_schedule = &timertab[i];
-      timertab[i].enable_interrupts();
-      return;
+            timer_for_schedule = &timertab[i];
+            timertab[i].enable_interrupts();
+            return;
+        }
     }
-  }
 
-  panic("Timer %s does not exist\n", name);
+    panic("Timer %s does not exist\n", name);
 }
 
 pde_t *
-alloc_pde_early_boot(void) {
-  /* Assume pde1, pde2 is already used */
-  extern uintptr_t pdefreestart, pdefreeend;
-  static uintptr_t pdefree = (uintptr_t)&pdefreestart;
+alloc_pd_early_boot(void) {
+    /* Assume pde1, pde2 is already used */
+    extern uintptr_t pdefreestart, pdefreeend;
+    static uintptr_t pdefree = (uintptr_t)&pdefreestart;
 
-  if (pdefree >= (uintptr_t)&pdefreeend) return NULL;
+    if (pdefree >= (uintptr_t)&pdefreeend) return NULL;
 
-  pde_t *ret = (pde_t *)pdefree;
-  pdefree += PAGE_SIZE;
-  return ret;
+    pde_t *ret = (pde_t *)pdefree;
+    pdefree += PAGE_SIZE;
+    return ret;
 }
 
 void
-map_addr_early_boot(uintptr_t addr, uintptr_t addr_phys, size_t sz) {
-  extern uintptr_t pml4phys;
+map_addr_early_boot(uintptr_t va, uintptr_t pa, size_t sz) {
+    extern uintptr_t pml4phys;
 
-  pml4e_t *pml4 = &pml4phys;
-  pdpe_t *pdpt;
-  pde_t *pde;
+    pml4e_t *pml4 = &pml4phys;
+    pdpe_t *pdp;
+    pde_t *pd;
 
-  uintptr_t addr_curr = ROUNDDOWN(addr, HUGE_PAGE_SIZE);
-  uintptr_t addr_curr_phys = ROUNDDOWN(addr_phys, HUGE_PAGE_SIZE);
-  uintptr_t addr_end = ROUNDUP(addr + sz, HUGE_PAGE_SIZE);
+    uintptr_t vstart = ROUNDDOWN(va, HUGE_PAGE_SIZE);
+    uintptr_t vend = ROUNDUP(va + sz, HUGE_PAGE_SIZE);
+    uintptr_t pstart = ROUNDDOWN(pa, HUGE_PAGE_SIZE);
 
-  pdpt = (pdpe_t *)PTE_ADDR(pml4[PML4_INDEX(addr_curr)]);
-  for (; addr_curr < addr_end; addr_curr += HUGE_PAGE_SIZE, addr_curr_phys += HUGE_PAGE_SIZE) {
-    pde = (pde_t *)PTE_ADDR(pdpt[PDP_INDEX(addr_curr)]);
-    if (!pde) {
-      pde = alloc_pde_early_boot();
-      pdpt[PDP_INDEX(addr_curr)] = (uintptr_t)pde | PTE_P | PTE_W;
+    pdp = (pdpe_t *)PTE_ADDR(pml4[PML4_INDEX(vstart)]);
+    for (; vstart < vend; vstart += HUGE_PAGE_SIZE, pstart += HUGE_PAGE_SIZE) {
+        pd = (pde_t *)PTE_ADDR(pdp[PDP_INDEX(vstart)]);
+        if (!pd) {
+            pd = alloc_pd_early_boot();
+            pdp[PDP_INDEX(vstart)] = (uintptr_t)pd | PTE_P | PTE_W;
+        }
+        pd[PD_INDEX(vstart)] = pstart | PTE_P | PTE_W | PTE_PS | PTE_G;
     }
-    pde[PD_INDEX(addr_curr)] = addr_curr_phys | PTE_P | PTE_W | PTE_MBZ;
-  }
 }
 
 /* Additionally maps pml4 memory so that we dont get memory errors on accessing
  * uefi_lp, MemMap, KASAN functions. */
 void
 early_boot_pml4_init(void) {
-
-  map_addr_early_boot((uintptr_t)uefi_lp, (uintptr_t)uefi_lp, sizeof(LOADER_PARAMS));
-  map_addr_early_boot((uintptr_t)uefi_lp->MemoryMap, (uintptr_t)uefi_lp->MemoryMap, uefi_lp->MemoryMapSize);
+    map_addr_early_boot((uintptr_t)uefi_lp, (uintptr_t)uefi_lp, sizeof(LOADER_PARAMS));
+    map_addr_early_boot((uintptr_t)uefi_lp->MemoryMap, (uintptr_t)uefi_lp->MemoryMap, uefi_lp->MemoryMapSize);
 
 #ifdef SANITIZE_SHADOW_BASE
-  map_addr_early_boot(SANITIZE_SHADOW_BASE, SANITIZE_SHADOW_BASE - KERNBASE, SANITIZE_SHADOW_SIZE);
+    map_addr_early_boot(SANITIZE_SHADOW_BASE, SANITIZE_SHADOW_BASE - KERNBASE, SANITIZE_SHADOW_SIZE);
 #endif
 
 #if LAB <= 6
-  map_addr_early_boot(FBUFFBASE, uefi_lp->FrameBufferBase, uefi_lp->FrameBufferSize);
+    map_addr_early_boot(FBUFFBASE, uefi_lp->FrameBufferBase, uefi_lp->FrameBufferSize);
 #endif
 }
 
 void
 i386_init(void) {
-  extern char end[];
+    extern char end[];
 
-  early_boot_pml4_init();
+    early_boot_pml4_init();
 
-  /* Initialize the console.
-   * Can't call cprintf until after we do this! */
-  cons_init();
+    /* Initialize the console.
+    * Can't call cprintf until after we do this! */
+    cons_init();
 
-  tsc_calibrate();
+    tsc_calibrate();
 
-  cprintf("6828 decimal is %o octal!\n", 6828);
-  cprintf("END: %p\n", end);
+    cprintf("6828 decimal is %o octal!\n", 6828);
+    cprintf("END: %p\n", end);
 
-  /* Lab 6 memory management initialization functions */
-  mem_init();
+    /* Lab 6 memory management initialization functions */
+    mem_init();
 
-  /* Perform global constructor initialisation (e.g. asan)
-   * This must be done as early as possible */
-   
-  extern void (*__ctors_start)();
-  extern void (*__ctors_end)();
-  void (**ctor)() = &__ctors_start;
-  while (ctor < &__ctors_end) (*ctor++)();
+    /* Perform global constructor initialisation (e.g. asan)
+    * This must be done as early as possible */
 
-  pic_init();
+    extern void (*__ctors_start)();
+    extern void (*__ctors_end)();
+    void (**ctor)() = &__ctors_start;
+    while (ctor < &__ctors_end) (*ctor++)();
+
+    pic_init();
 
 #ifdef SANITIZE_SHADOW_BASE
-  kasan_mem_init();
+    kasan_mem_init();
 #endif
 
-  timers_init();
+    timers_init();
 
-  /* Framebuffer init should be done after memory init */
-  fb_init();
-  cprintf("Framebuffer initialised\n");
+    /* Framebuffer init should be done after memory init */
+    fb_init();
+    cprintf("Framebuffer initialised\n");
 
-  /* User environment initialization functions */
-  env_init();
-  trap_init();
+    /* User environment initialization functions */
+    env_init();
+    trap_init();
 
-  /* Choose the timer used for scheduling: hpet or pit */
-  timers_schedule("hpet0");
+    /* Choose the timer used for scheduling: hpet or pit */
+    timers_schedule("hpet0");
 
 #ifdef CONFIG_KSPACE
-  /* Touch all you want */
-  ENV_CREATE_KERNEL_TYPE(prog_test1);
-  ENV_CREATE_KERNEL_TYPE(prog_test2);
-  ENV_CREATE_KERNEL_TYPE(prog_test3);
-  ENV_CREATE_KERNEL_TYPE(prog_test4);
-  ENV_CREATE_KERNEL_TYPE(prog_test5);
-  ENV_CREATE_KERNEL_TYPE(prog_test6);
+    /* Touch all you want */
+    ENV_CREATE_KERNEL_TYPE(prog_test1);
+    ENV_CREATE_KERNEL_TYPE(prog_test2);
+    ENV_CREATE_KERNEL_TYPE(prog_test3);
+    ENV_CREATE_KERNEL_TYPE(prog_test4);
+    ENV_CREATE_KERNEL_TYPE(prog_test5);
+    ENV_CREATE_KERNEL_TYPE(prog_test6);
 #else
-  ENV_CREATE(fs_fs, ENV_TYPE_FS);
+    ENV_CREATE(fs_fs, ENV_TYPE_FS);
 
 #if defined(TEST)
-  /* Don't touch -- used by grading script! */
-  ENV_CREATE(TEST, ENV_TYPE_USER);
+    /* Don't touch -- used by grading script! */
+    ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
-  /* Touch all you want. */
-  ENV_CREATE(user_icode, ENV_TYPE_USER);
+    /* Touch all you want. */
+    ENV_CREATE(user_icode, ENV_TYPE_USER);
 #endif /* TEST* */
 #endif
 
-  /* Should not be necessary - drains keyboard because interrupt has given up. */
-  kbd_intr();
+    /* Should not be necessary - drains keyboard because interrupt has given up. */
+    kbd_intr();
 
-  /* Schedule and run the first user environment! */
-  sched_yield();
+    /* Schedule and run the first user environment! */
+    sched_yield();
 }
 
 /* Variable panicstr contains argument to first call to panic; used as flag
@@ -183,34 +182,33 @@ const char *panicstr = NULL;
  * It prints "panic: mesg", and then enters the kernel monitor. */
 _Noreturn void
 _panic(const char *file, int line, const char *fmt, ...) {
-  va_list ap;
+    va_list ap;
 
-  if (panicstr)
-    goto dead;
-  panicstr = fmt;
+    if (panicstr) goto dead;
+    panicstr = fmt;
 
-  /* Be extra sure that the machine is in as reasonable state */
-  asm volatile("cli; cld");
+    /* Be extra sure that the machine is in as reasonable state */
+    asm volatile("cli; cld");
 
-  va_start(ap, fmt);
-  cprintf("kernel panic at %s:%d: ", file, line);
-  vcprintf(fmt, ap);
-  cprintf("\n");
-  va_end(ap);
+    va_start(ap, fmt);
+    cprintf("kernel panic at %s:%d: ", file, line);
+    vcprintf(fmt, ap);
+    cprintf("\n");
+    va_end(ap);
 
 dead:
   /* Break into the kernel monitor */
-  for(;;) monitor(NULL);
+    for(;;) monitor(NULL);
 }
 
 /* Like panic, but don't */
 void
 _warn(const char *file, int line, const char *fmt, ...) {
-  va_list ap;
+    va_list ap;
 
-  va_start(ap, fmt);
-  cprintf("kernel warning at %s:%d: ", file, line);
-  vcprintf(fmt, ap);
-  cprintf("\n");
-  va_end(ap);
+    va_start(ap, fmt);
+    cprintf("kernel warning at %s:%d: ", file, line);
+    vcprintf(fmt, ap);
+    cprintf("\n");
+    va_end(ap);
 }

@@ -14,81 +14,81 @@ static bool pic_initilalized;
 void
 pic_init(void) {
 
-  /* mask all interrupts */
-  outb(IO_PIC1_DATA, 0xFF);
-  outb(IO_PIC2_DATA, 0xFF);
+    /* mask all interrupts */
+    outb(IO_PIC1_DATA, 0xFF);
+    outb(IO_PIC2_DATA, 0xFF);
 
-  /* Set up master (8259A-1) */
+    /* Set up master (8259A-1) */
 
-  /* ICW1:  0001g0hi
-   *    g:  0 = edge triggering, 1 = level triggering
-   *    h:  0 = cascaded PICs, 1 = master only
-   *    i:  0 = no ICW4, 1 = ICW4 required */
-  outb(IO_PIC1_CMND, 0x11);
-  /* ICW2:  Vector offset */
-  outb(IO_PIC1_DATA, IRQ_OFFSET);
-  /* ICW3:  bit mask of IR lines connected to slave PICs (master PIC),
-   *        3-bit No of IR line at which slave connects to master(slave PIC) */
-  outb(IO_PIC1_DATA, 1 << IRQ_SLAVE);
-  /* ICW4:  000nbmap
-   *    n:  1 = special fully nested mode
-   *    b:  1 = buffered mode
-   *    m:  0 = slave PIC, 1 = master PIC
-   *      (ignored when b is 0, as the master/slave role can be hardwired).
-   *    a:  1 = Automatic EOI mode
-   *    p:  0 = MCS-80/85 mode, 1 = intel x86 mode */
-  outb(IO_PIC1_DATA, 0x1);
+    /* ICW1:  0001g0hi
+     *    g:  0 = edge triggering, 1 = level triggering
+     *    h:  0 = cascaded PICs, 1 = master only
+     *    i:  0 = no ICW4, 1 = ICW4 required */
+    outb(IO_PIC1_CMND, 0x11);
+    /* ICW2:  Vector offset */
+    outb(IO_PIC1_DATA, IRQ_OFFSET);
+    /* ICW3:  bit mask of IR lines connected to slave PICs (master PIC),
+     *        3-bit No of IR line at which slave connects to master(slave PIC) */
+    outb(IO_PIC1_DATA, 1 << IRQ_SLAVE);
+    /* ICW4:  000nbmap
+     *    n:  1 = special fully nested mode
+     *    b:  1 = buffered mode
+     *    m:  0 = slave PIC, 1 = master PIC
+     *      (ignored when b is 0, as the master/slave role can be hardwired).
+     *    a:  1 = Automatic EOI mode
+     *    p:  0 = MCS-80/85 mode, 1 = intel x86 mode */
+    outb(IO_PIC1_DATA, 0x1);
 
-  /* Set up slave (8259A-2) */
+    /* Set up slave (8259A-2) */
 
-  /* ICW1 */
-  outb(IO_PIC2_CMND, 0x11);
-  /* ICW2 */
-  outb(IO_PIC2_DATA, IRQ_OFFSET + 8);
-  /* ICW3 */
-  outb(IO_PIC2_DATA, IRQ_SLAVE);
-  /* ICW4 */
-  /* NOTE Automatic EOI mode doesn't tend to work on the slave.
-   * Linux source code says it's "to be investigated" */
-  outb(IO_PIC2_DATA, 0x01);
+    /* ICW1 */
+    outb(IO_PIC2_CMND, 0x11);
+    /* ICW2 */
+    outb(IO_PIC2_DATA, IRQ_OFFSET + 8);
+    /* ICW3 */
+    outb(IO_PIC2_DATA, IRQ_SLAVE);
+    /* ICW4 */
+    /* NOTE Automatic EOI mode doesn't tend to work on the slave.
+     * Linux source code says it's "to be investigated" */
+    outb(IO_PIC2_DATA, 0x01);
 
-  /* OCW3:  0ef01prs
-   *   ef:  0x = NOP, 10 = clear specific mask, 11 = set specific mask
-   *    p:  0 = no polling, 1 = polling mode
-   *   rs:  0x = NOP, 10 = read IRR, 11 = read ISR */
-  /* Clear specific mask */
-  outb(IO_PIC1_CMND, 0x68);
-  /* Read IRR by default */
-  outb(IO_PIC1_CMND, 0x0a);
+    /* OCW3:  0ef01prs
+     *   ef:  0x = NOP, 10 = clear specific mask, 11 = set specific mask
+     *    p:  0 = no polling, 1 = polling mode
+     *   rs:  0x = NOP, 10 = read IRR, 11 = read ISR */
+    /* Clear specific mask */
+    outb(IO_PIC1_CMND, 0x68);
+    /* Read IRR by default */
+    outb(IO_PIC1_CMND, 0x0a);
 
-  /* OCW3 */
-  outb(IO_PIC2_CMND, 0x68);
-  outb(IO_PIC2_CMND, 0x0a);
+    /* OCW3 */
+    outb(IO_PIC2_CMND, 0x68);
+    outb(IO_PIC2_CMND, 0x0a);
 
-  pic_initilalized = 1;
+    pic_initilalized = 1;
 
-  if (irq_mask_8259A != 0xFFFF)
-    irq_setmask_8259A(irq_mask_8259A);
+    if (irq_mask_8259A != 0xFFFF)
+        irq_setmask_8259A(irq_mask_8259A);
 }
 
 void
 irq_setmask_8259A(uint16_t mask) {
-  irq_mask_8259A = mask;
+    irq_mask_8259A = mask;
 
-  if (!pic_initilalized) return;
+    if (!pic_initilalized) return;
 
-  outb(IO_PIC1_DATA, (char)mask);
-  outb(IO_PIC2_DATA, (char)(mask >> 8));
+    outb(IO_PIC1_DATA, (char)mask);
+    outb(IO_PIC2_DATA, (char)(mask >> 8));
 
-  cprintf("enabled interrupts:");
-  for (unsigned i = 0; i < 16; i++)
-    if (~mask & (1 << i))
-      cprintf(" %d", i);
-  cprintf("\n");
+    cprintf("enabled interrupts:");
+    for (int i = 0; i < 16; i++)
+        if (~mask & (1 << i))
+            cprintf(" %d", i);
+    cprintf("\n");
 }
 
 void
 pic_send_eoi(uint8_t irq) {
-  if (irq > 7) outb(IO_PIC2_CMND, PIC_EOI);
-  outb(IO_PIC1_CMND, PIC_EOI);
+    if (irq > 7) outb(IO_PIC2_CMND, PIC_EOI);
+    outb(IO_PIC1_CMND, PIC_EOI);
 }

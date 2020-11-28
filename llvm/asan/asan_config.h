@@ -16,27 +16,27 @@
 #ifndef __ASAN_CONFIG_H__
 #define __ASAN_CONFIG_H__
 
-// Supported C-like functions used in ASAN.
+/* Supported C-like functions used in ASAN. */
 #define PLATFORM_ASAN_HAVE_PRINTF
 #define PLATFORM_ASAN_HAVE_ABORT
-//#define PLATFORM_ASAN_HAVE_DEBUG_BREAK
+/*#define PLATFORM_ASAN_HAVE_DEBUG_BREAK */
 
-// Actual symbol names for supported C-like functions.
+/* Actual symbol names for supported C-like functions. */
 #define PLATFORM_ASAN_PRINTF      cprintf
 #define PLATFORM_ASAN_ABORT       platform_abort
 #define PLATFORM_ASAN_DEBUG_BREAK debug_break
 
-// Enable or disable use after return check:
-// https://github.com/google/sanitizers/wiki/AddressSanitizerUseAfterReturn
+/* Enable or disable use after return check: */
+/* https://github.com/google/sanitizers/wiki/AddressSanitizerUseAfterReturn */
 #define PLATFORM_ASAN_USE_AFTER_RETURN 0
 
 #define PLATFORM_ASAN_USE_REPORT_GLOBALS 1
 
-// Max number of threads for fakestack to track
-// TODO: this should be properly determined at compile time.
+/* Max number of threads for fakestack to track */
+/* TODO: this should be properly determined at compile time. */
 #define PLATFORM_ASAN_FASESTACK_THREAD_MAX 0
 
-// Max fakestack entries of each class
+/* Max fakestack entries of each class */
 #define PLATFORM_ASAN_FAKESTACK_CLASS_0_N  0
 #define PLATFORM_ASAN_FAKESTACK_CLASS_1_N  0
 #define PLATFORM_ASAN_FAKESTACK_CLASS_2_N  0
@@ -49,18 +49,18 @@
 #define PLATFORM_ASAN_FAKESTACK_CLASS_9_N  0
 #define PLATFORM_ASAN_FAKESTACK_CLASS_10_N 0
 
-// Redzone size to the left of the allocated fake stack
+/* Redzone size to the left of the allocated fake stack */
 #define PLATFORM_ASAN_FAKESTACK_LEFT_RED_SIZE 16
 
-// Are we guaranteed to know the value our stack is initialised with?
+/* Are we guaranteed to know the value our stack is initialised with? */
 #define PLATFORM_ASAN_HAVE_STACK_DUMP
 
-// Last value to guarantee that no more stack frames are available
+/* Last value to guarantee that no more stack frames are available */
 #define PLATFORM_ASAN_STACK_LAST 0
 
-// These functions allow you to wrap existing intrinsics and compile
-// them without asan enabled (which is generally more reliable and
-// better for performance).
+/* These functions allow you to wrap existing intrinsics and compile
+ * them without asan enabled (which is generally more reliable and
+ * better for performance). */
 
 #define PLATFORM_ASAN_HAVE_MEMCPY
 #define PLATFORM_ASAN_HAVE_MEMSET

@@ -71,7 +71,7 @@
 #define PML4_INDEX(la) ((((uintptr_t)(la)) >> PML4_SHIFT) & (PML4_ENTRY_COUNT - 1))
 
 /* Construct linear address from indexes and offset */
-#define MAKE_ADDR(m, p, d, t, o) ((void*)((m) << PML4_SHIFT | (p) << PDP_SHIFT | (d) << PD_SHIFT | (t) << PT_SHIFT | (o)))
+#define MAKE_ADDR(m, p, d, t, o) ((void*)((uintptr_t)(m) << PML4_SHIFT | (uintptr_t)(p) << PDP_SHIFT | (uintptr_t)(d) << PD_SHIFT | (uintptr_t)(t) << PT_SHIFT | (o)))
 
 #define VPT(la)    PAGE_NUMBER(la)                 /* used to index into vpt[] */
 #define VPD(la)    (((uintptr_t)(la)) >> PD_SHIFT) /* used to index into vpd[] */

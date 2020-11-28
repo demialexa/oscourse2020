@@ -19,7 +19,7 @@ pgfault(struct UTrapframe *utf) {
      *   Use the read-only page table mappings at uvpt
      *   (see <inc/memlayout.h>). */
 
-    // LAB 9: Your code here:
+    // LAB 9: Your code here
     pte_t ent = get_uvpt_entry((void *)utf->utf_fault_va);
     if ((ent & (PTE_COW | PTE_P)) != (PTE_P | PTE_COW) || !(utf->utf_err & FEC_WR))
         panic("User pagefault at va=%p ip=%p\n", (void *)utf->utf_fault_va, (void *)utf->utf_rip);
@@ -32,17 +32,14 @@ pgfault(struct UTrapframe *utf) {
      *   No need to explicitly delete the old page's mapping.
      *   Make sure you DO NOT use sanitized memcpy/memset routines when using UASAN. */
 
-    // LAB 9: Your code here:
-
+    // LAB 9: Your code here
     void *addr = (void *)ROUNDDOWN(utf->utf_fault_va, PAGE_SIZE);
 
-    if (pageref(addr) == 1) {
-        /* Only one reference, no need to copy */
-        res = sys_page_map(0, addr, 0, addr, PTE_U | PTE_P | PTE_W);
-        if (res < 0) panic("[pagefault] sys_page_map: %i\n", res);
+    /* Only one reference, no need to copy */
+    if (pageref(addr) != 1 || sys_page_map(CURENVID, addr, CURENVID, addr, PTE_UWP) < 0) {
+        /* If remapping failed or there's more (or less) than one ref, we need to copy */
 
-    } else {
-        res = sys_page_alloc(0, PFTEMP, PTE_U | PTE_P | PTE_W);
+        res = sys_page_alloc(CURENVID, PFTEMP, PTE_UWP);
         if (res < 0) panic("[pagefault] sys_page_alloc: %i\n", res);
 
 #ifdef SANITIZE_USER_SHADOW_BASE
@@ -51,13 +48,12 @@ pgfault(struct UTrapframe *utf) {
         memcpy(PFTEMP, addr, PAGE_SIZE);
 #endif
 
-        res = sys_page_map(0, PFTEMP, 0, addr, PTE_U | PTE_P | PTE_W);
+        res = sys_page_map(CURENVID, PFTEMP, CURENVID, addr, PTE_UWP);
         if (res < 0) panic("[pagefault] sys_page_map: %i\n", res);
 
-        res = sys_page_unmap(0, PFTEMP);
+        res = sys_page_unmap(CURENVID, PFTEMP);
         if (res < 0) panic("[pagefault] sys_page_unmap: %i\n", res);
-  }
-
+    }
 }
 
 /* Map our virtual page pn (address pn*PAGE_SIZE) into the target envid
@@ -70,17 +66,23 @@ pgfault(struct UTrapframe *utf) {
  * Returns: 0 on success, < 0 on error.
  * It is also OK to panic on error. */
 static int
-duppage(envid_t envid, uintptr_t pn) {
+duppage(envid_t envid, void *addr) {
     // LAB 9: Your code here:
 
-    pte_t ent = uvpt[pn];
-    int res = sys_page_map(0, (void *)(pn * PAGE_SIZE), envid,
-                              (void *)(pn * PAGE_SIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
+    pte_t ent = uvpt[VPT(addr)] & PTE_SYSCALL;
 
-    if (res >= 0 && ent & PTE_W) {
-        res = sys_page_map(0, (void *)(pn * PAGE_SIZE), 0,
-                              (void *)(pn * PAGE_SIZE), (ent & PTE_SYSCALL & ~PTE_W) | PTE_COW);
+    int res;
+    if (ent & PTE_W) {
+        ent = (ent | PTE_COW) & ~PTE_W;
+
+        res = sys_page_map(CURENVID, addr, envid, addr, ent);
+        if (res < 0) return res;
+
+        res = sys_page_map(CURENVID, addr, CURENVID, addr, ent);
+    } else {
+        res = sys_page_map(CURENVID, addr, envid, addr, ent);
     }
+
     return res;
 }
 
@@ -103,58 +105,58 @@ fork(void) {
     // LAB 9: Your code here.
 
     set_pgfault_handler(pgfault);
-    int err = 0, res = sys_exofork();
-    thisenv = &envs[ENVX(sys_getenvid())];
+    int res = 0, child = sys_exofork();
+    if (!child) thisenv = &envs[ENVX(sys_getenvid())];
 
-    if (res <= 0) return res;
+    if (child <= 0) return child;
 
-
-    for (size_t i = 0; i < UTOP; i += PAGE_SIZE) {
-        if (!(uvpml4[VPML4(i)] & PTE_P)) {
-            i += HUGE_PAGE_SIZE*PD_ENTRY_COUNT*PDP_ENTRY_COUNT - PAGE_SIZE;
+    for (char *addr = 0; addr < (char *)UTOP; addr += PAGE_SIZE) {
+        if (!(uvpml4[VPML4(addr)] & PTE_P)) {
+            addr += HUGE_PAGE_SIZE*PD_ENTRY_COUNT*PDP_ENTRY_COUNT - PAGE_SIZE;
             continue;
         }
-        if (!(uvpdp[VPDP(i)] & PTE_P)) {
-            i += HUGE_PAGE_SIZE*PD_ENTRY_COUNT - PAGE_SIZE;
+        if (!(uvpdp[VPDP(addr)] & PTE_P)) {
+            addr += HUGE_PAGE_SIZE*PD_ENTRY_COUNT - PAGE_SIZE;
             continue;
         }
-        if (!(uvpd[VPD(i)] & PTE_P)) {
-            i += HUGE_PAGE_SIZE - PAGE_SIZE;
+        if (!(uvpd[VPD(addr)] & PTE_P)) {
+            addr += HUGE_PAGE_SIZE - PAGE_SIZE;
             continue;
         }
+        pte_t ent = uvpt[VPT(addr)];
+        if (!(ent & PTE_P)) continue;
+
         if (
 #ifdef SANITIZE_USER_SHADOW_BASE
-#define _IN(x)  (i >= ROUNDDOWN(SANITIZE_USER##x##SHADOW_BASE, PAGE_SIZE) &&\
-                 i < ROUNDUP(SANITIZE_USER##x##SHADOW_BASE + SANITIZE_USER##x##SHADOW_SIZE, PAGE_SIZE))
-            _IN(_) || _IN(_EXTRA_) || _IN(_FS_) || _IN(_VPT_) ||
+#define _IN(x)  (addr >= ROUNDDOWN(SANITIZE_USER##x##SHADOW_BASE, PAGE_SIZE) &&\
+                 addr < ROUNDUP(SANITIZE_USER##x##SHADOW_BASE + SANITIZE_USER##x##SHADOW_SIZE, PAGE_SIZE))
+                _IN(_) || _IN(_EXTRA_) || _IN(_FS_) || _IN(_VPT_) ||
 #undef _IN
 #endif
-            (i >= UXSTACKTOP - UXSTACKSIZE && i < UXSTACKTOP)) {
-                err = sys_page_alloc(res, (void *)i, PTE_U | PTE_P | PTE_W);
-        } else if (uvpt[VPT(i)] & PTE_P) {
-            if (uvpt[VPT(i)] & PTE_SHARE) {
-                err = sys_page_map(0, (void *)i, res, (void *)i, uvpt[VPT(i)] & PTE_SYSCALL);
-          } else {
-                err = duppage(res, VPT(i));
-          }
+                (((uintptr_t)addr - UXSTACKTOP + UXSTACKSIZE) < UXSTACKSIZE)) {
+            res = sys_page_alloc(child, addr, PTE_UWP);
+        } else if (ent & PTE_SHARE) {
+            res = sys_page_map(CURENVID, addr, child, addr, ent & PTE_SYSCALL);
+        } else {
+            res = duppage(child, addr);
         }
-        if (err < 0) goto error;
+        if (res < 0) goto error;
     }
 
-    err = sys_env_set_pgfault_upcall(res, thisenv->env_pgfault_upcall);
-    if (err < 0) goto error;
+    res = sys_env_set_pgfault_upcall(child, thisenv->env_pgfault_upcall);
+    if (res < 0) goto error;
 
-    err = sys_env_set_status(res, ENV_RUNNABLE);
-    if (err < 0) goto error;
+    res = sys_env_set_status(child, ENV_RUNNABLE);
+    if (res < 0) goto error;
 
     /* NOTE: Duplicating shadow addresses is insane.
      *       Make sure to skip shadow addresses in COW above. */
 
-    return res;
+    return child;
 
  error:
-    sys_env_destroy(res);
-    return err;
+    sys_env_destroy(child);
+    return res;
 }
 
 envid_t sfork() {

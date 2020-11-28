@@ -20,11 +20,11 @@ extern bool in_clk_intr;
 
 static inline bool
 in_interrupt(void) {
-  return !!in_intr;
+    return !!in_intr;
 }
 
 static inline bool
 in_clock_interrupt(void) {
-  return in_intr && in_clk_intr;
+    return in_intr && in_clk_intr;
 }
 #endif

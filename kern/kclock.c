@@ -8,11 +8,11 @@
 
 uint8_t
 cmos_read8(uint8_t reg) {
-  /* MC146818A controller */
-  outb(CMOS_CMD, reg | CMOS_NMI_LOCK);
-  uint8_t res = inb(CMOS_DATA);
-  nmi_enable();
-  return res;
+    /* MC146818A controller */
+    outb(CMOS_CMD, reg | CMOS_NMI_LOCK);
+    uint8_t res = inb(CMOS_DATA);
+    nmi_enable();
+    return res;
 }
 
 void
@@ -29,13 +29,13 @@ cmos_read16(uint8_t reg) {
 
 static void
 rtc_timer_pic_interrupt(void) {
-  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
+    irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
 }
 
 static void
 rtc_timer_pic_handle(void) {
-  rtc_check_status();
-  pic_send_eoi(IRQ_CLOCK);
+    rtc_check_status();
+    pic_send_eoi(IRQ_CLOCK);
 }
 
 struct Timer timer_rtc = {
@@ -47,19 +47,19 @@ struct Timer timer_rtc = {
 
 void
 rtc_timer_init(void) {
-  // LAB 4: Your code here:
+    // LAB 4: Your code here
 
-  uint8_t rga = cmos_read8(RTC_AREG);
-  cmos_write8(RTC_AREG, RTC_SET_NEW_RATE(rga, RTC_500MS_RATE));
+    uint8_t rga = cmos_read8(RTC_AREG);
+    cmos_write8(RTC_AREG, RTC_SET_NEW_RATE(rga, RTC_500MS_RATE));
 
-  uint8_t rgb = cmos_read8(RTC_BREG);
-  cmos_write8(RTC_BREG, rgb | RTC_PIE);
+    uint8_t rgb = cmos_read8(RTC_BREG);
+    cmos_write8(RTC_BREG, rgb | RTC_PIE);
 }
 
 uint8_t
 rtc_check_status(void) {
-  // LAB 4: Your code here:
+    // LAB 4: Your code here
 
-  return cmos_read8(RTC_CREG);
+    return cmos_read8(RTC_CREG);
 }
 

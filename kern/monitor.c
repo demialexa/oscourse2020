@@ -21,10 +21,10 @@
 #define MAXARGS    16
 
 struct Command {
-  const char *name;
-  const char *desc;
-  /* return -1 to force monitor to exit */
-  int (*func)(int argc, char **argv, struct Trapframe *tf);
+    const char *name;
+    const char *desc;
+    /* return -1 to force monitor to exit */
+    int (*func)(int argc, char **argv, struct Trapframe *tf);
 };
 
 static struct Command commands[] = {
@@ -44,66 +44,66 @@ static struct Command commands[] = {
 
 int
 mon_help(int argc, char **argv, struct Trapframe *tf) {
-  for (size_t i = 0; i < NCOMMANDS; i++)
-    cprintf("%s - %s\n", commands[i].name, commands[i].desc);
-  return 0;
+    for (size_t i = 0; i < NCOMMANDS; i++)
+        cprintf("%s - %s\n", commands[i].name, commands[i].desc);
+    return 0;
 }
 
 int
 mon_hello(int argc, char **argv, struct Trapframe *tf) {
-  cprintf("Hello!\n");
-  return 0;
+    cprintf("Hello!\n");
+    return 0;
 }
 
 int
 mon_kerninfo(int argc, char **argv, struct Trapframe *tf) {
-  extern char _head64[], entry[], etext[], edata[], end[];
+    extern char _head64[], entry[], etext[], edata[], end[];
 
-  cprintf("Special kernel symbols:\n");
-  cprintf("  _head64 %16lx (virt)  %16lx (phys)\n", (unsigned long)_head64, (unsigned long)_head64);
-  cprintf("  entry   %16lx (virt)  %16lx (phys)\n", (unsigned long)entry, (unsigned long)entry - KERNBASE);
-  cprintf("  etext   %16lx (virt)  %16lx (phys)\n", (unsigned long)etext, (unsigned long)etext - KERNBASE);
-  cprintf("  edata   %16lx (virt)  %16lx (phys)\n", (unsigned long)edata, (unsigned long)edata - KERNBASE);
-  cprintf("  end     %16lx (virt)  %16lx (phys)\n", (unsigned long)end, (unsigned long)end - KERNBASE);
-  cprintf("Kernel executable memory footprint: %luKB\n", (unsigned long)ROUNDUP(end - entry, 1024) / 1024);
-  return 0;
+    cprintf("Special kernel symbols:\n");
+    cprintf("  _head64 %16lx (virt)  %16lx (phys)\n", (unsigned long)_head64, (unsigned long)_head64);
+    cprintf("  entry   %16lx (virt)  %16lx (phys)\n", (unsigned long)entry, (unsigned long)entry - KERNBASE);
+    cprintf("  etext   %16lx (virt)  %16lx (phys)\n", (unsigned long)etext, (unsigned long)etext - KERNBASE);
+    cprintf("  edata   %16lx (virt)  %16lx (phys)\n", (unsigned long)edata, (unsigned long)edata - KERNBASE);
+    cprintf("  end     %16lx (virt)  %16lx (phys)\n", (unsigned long)end, (unsigned long)end - KERNBASE);
+    cprintf("Kernel executable memory footprint: %luKB\n", (unsigned long)ROUNDUP(end - entry, 1024) / 1024);
+    return 0;
 }
 
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
-  // LAB 2: Your code here:
+    // LAB 2: Your code here
 
-  uintptr_t cr3 = rcr3();
-  cprintf("%p %p %p\n", (void *)cr3, (void *)curenv->env_cr3, (void *)kern_cr3);
+    uintptr_t cr3 = rcr3();
+    cprintf("%p %p %p\n", (void *)cr3, (void *)curenv->env_cr3, (void *)kern_cr3);
 
-  uintptr_t rip, *rbp;
+    uintptr_t rip, *rbp;
 
-  /* Read current address and current stack frame */
-  rbp = (uintptr_t *)read_rbp();
+    /* Read current address and current stack frame */
+    rbp = (uintptr_t *)(tf ? tf->tf_regs.reg_rbp : read_rbp());
 
-  cprintf("Stack backtrace: \n");
-  do {
-    pte_t *pte = pml4e_walk(KADDR(cr3), rbp, 0);
-    pte_t *pte2 = pml4e_walk(KADDR(cr3), rbp + 1, 0);
-    if (!pte || !pte2 || !(*pte & PTE_P) || !(*pte2 & PTE_P)) {
-      cprintf("<Unreadable memory>\n");
-      return 1;
-    }
+    cprintf("Stack backtrace: \n");
+    do {
+        pte_t *pte = walk_pagetable(KADDR(cr3), rbp, 0);
+        pte_t *pte2 = walk_pagetable(KADDR(cr3), rbp + 1, 0);
+        if (!pte || !pte2 || !(*pte & PTE_P) || !(*pte2 & PTE_P)) {
+          cprintf("<Unreadable memory>\n");
+          return 1;
+        }
 
-    rip = rbp[1];
+        rip = rbp[1];
 
-    struct Ripdebuginfo info;
-    debuginfo_rip(rip, &info);
+        struct Ripdebuginfo info;
+        debuginfo_rip(rip, &info);
 
-    cprintf("  rbp %016lx  rip %016lx\n", (unsigned long)rbp, (unsigned long)rip);
-    cprintf("    %.256s:%d: %.*s+%ld\n", info.rip_file, info.rip_line,
-            info.rip_fn_namelen, info.rip_fn_name, rip - info.rip_fn_addr);
+        cprintf("  rbp %016lx  rip %016lx\n", (unsigned long)rbp, (unsigned long)rip);
+        cprintf("    %.256s:%d: %.*s+%ld\n", info.rip_file, info.rip_line,
+                info.rip_fn_namelen, info.rip_fn_name, rip - info.rip_fn_addr);
 
-    /* Next stack frame */
-    rbp = (uintptr_t *)rbp[0];
-  } while (rbp);
+        /* Next stack frame */
+        rbp = (uintptr_t *)rbp[0];
+    } while (rbp);
 
-  return 0;
+    return 0;
 }
 
 // Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
@@ -111,22 +111,22 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
 
 int
 mon_start(int argc, char **argv, struct Trapframe *tf) {
-  if (argc < 2) return 1;
-  timer_start(argv[1]);
-  return 0;
+    if (argc < 2) return 1;
+    timer_start(argv[1]);
+    return 0;
 }
 
 int
 mon_stop(int argc, char **argv, struct Trapframe *tf) {
-  timer_stop();
-  return 0;
+    timer_stop();
+    return 0;
 }
 
 int
 mon_frequency(int argc, char **argv, struct Trapframe *tf) {
-  if (argc < 2) return 1;
-  timer_cpu_frequency(argv[1]);
-  return 0;
+    if (argc < 2) return 1;
+    timer_cpu_frequency(argv[1]);
+    return 0;
 }
 
 // LAB 6: Your code here.
@@ -148,35 +148,35 @@ mon_memory(int argc, char **argv, struct Trapframe *tf) {
 
 int
 mon_pagedump(int argc, char **argv, struct Trapframe *tf) {
-  pml4e_t *pml4 = kern_pml4e;
-  cprintf("CR3 %016lX\n", kern_cr3);
-  cprintf("PML4 %p\n", kern_pml4e);
-  for (size_t i = 0; i < PML4_ENTRY_COUNT; i++) {
-    if (pml4[i] & PTE_P) {
-      cprintf("|-[%03lu] = %016lX\n", i, pml4[i]);
-      pdpe_t *pdpe = KADDR(PTE_ADDR(pml4[i]));
-      for (size_t i = 0; i < PDP_ENTRY_COUNT; i++) {
-        if (pdpe[i] & PTE_P) {
-          cprintf("   |-[%03lu] = %016lX\n", i, pdpe[i]);
-          pde_t *pde = KADDR(PTE_ADDR(pdpe[i]));
-          for (size_t i = 0; i < PD_ENTRY_COUNT; i++) {
-            if (pde[i] & PTE_P) {
-              cprintf("      |-[%03lu] = %016lX\n", i, pde[i]);
+    pml4e_t *pml4 = kern_pml4;
+    cprintf("CR3 %016lX\n", kern_cr3);
+    cprintf("PML4 %p\n", kern_pml4);
+    for (size_t i = 0; i < PML4_ENTRY_COUNT; i++) {
+        if (pml4[i] & PTE_P) {
+            cprintf("|-[%03lu] = %016lX\n", i, pml4[i]);
+            pdpe_t *pdpe = KADDR(PTE_ADDR(pml4[i]));
+            for (size_t i = 0; i < PDP_ENTRY_COUNT; i++) {
+                if (pdpe[i] & PTE_P) {
+                    cprintf("   |-[%03lu] = %016lX\n", i, pdpe[i]);
+                    pde_t *pde = KADDR(PTE_ADDR(pdpe[i]));
+                    for (size_t i = 0; i < PD_ENTRY_COUNT; i++) {
+                        if (pde[i] & PTE_P) {
+                            cprintf("      |-[%03lu] = %016lX\n", i, pde[i]);
 #if 0 // Slow
-              pte_t *pte = KADDR(PTE_ADDR(pde[i]));
-              for (size_t i = 0; i < PT_ENTRY_COUNT; i++) {
-                if (pte[i] & PTE_P) {
-                    cprintf("         |-[%03lu] = %016lX\n", i, pte[i]);
-                }
-              }
+                            pte_t *pte = KADDR(PTE_ADDR(pde[i]));
+                            for (size_t i = 0; i < PT_ENTRY_COUNT; i++) {
+                                if (pte[i] & PTE_P) {
+                                    cprintf("         |-[%03lu] = %016lX\n", i, pte[i]);
+                                }
+                            }
 #endif
+                        }
+                    }
+                }
             }
-          }
         }
-      }
     }
-  }
-  return 0;
+    return 0;
 }
 
 
@@ -185,47 +185,47 @@ mon_pagedump(int argc, char **argv, struct Trapframe *tf) {
 
 static int
 runcmd(char *buf, struct Trapframe *tf) {
-  int argc = 0;
-  char *argv[MAXARGS];
+    int argc = 0;
+    char *argv[MAXARGS];
 
-  argv[0] = NULL;
+    argv[0] = NULL;
 
-  /* Parse the command buffer into whitespace-separated arguments */
-  for (;;) {
-    /* gobble whitespace */
-    while (*buf && strchr(WHITESPACE, *buf)) *buf++ = 0;
-    if (!*buf) break;
+    /* Parse the command buffer into whitespace-separated arguments */
+    for (;;) {
+        /* gobble whitespace */
+        while (*buf && strchr(WHITESPACE, *buf)) *buf++ = 0;
+        if (!*buf) break;
 
-    /* save and scan past next arg */
-    if (argc == MAXARGS - 1) {
-      cprintf("Too many arguments (max %d)\n", MAXARGS);
-      return 0;
+        /* save and scan past next arg */
+        if (argc == MAXARGS - 1) {
+            cprintf("Too many arguments (max %d)\n", MAXARGS);
+            return 0;
+        }
+        argv[argc++] = buf;
+        while (*buf && !strchr(WHITESPACE, *buf)) buf++;
     }
-    argv[argc++] = buf;
-    while (*buf && !strchr(WHITESPACE, *buf)) buf++;
-  }
-  argv[argc] = NULL;
+    argv[argc] = NULL;
 
-  /* Lookup and invoke the command */
-  if (!argc) return 0;
-  for (size_t i = 0; i < NCOMMANDS; i++) {
-    if (strcmp(argv[0], commands[i].name) == 0)
-      return commands[i].func(argc, argv, tf);
-  }
+    /* Lookup and invoke the command */
+    if (!argc) return 0;
+    for (size_t i = 0; i < NCOMMANDS; i++) {
+        if (strcmp(argv[0], commands[i].name) == 0)
+        return commands[i].func(argc, argv, tf);
+    }
 
-  cprintf("Unknown command '%s'\n", argv[0]);
-  return 0;
+    cprintf("Unknown command '%s'\n", argv[0]);
+    return 0;
 }
 
 void
 monitor(struct Trapframe *tf) {
 
-  cprintf("Welcome to the JOS kernel monitor!\n");
-  cprintf("Type 'help' for a list of commands.\n");
+    cprintf("Welcome to the JOS kernel monitor!\n");
+    cprintf("Type 'help' for a list of commands.\n");
 
-  if (tf) print_trapframe(tf);
+    if (tf) print_trapframe(tf);
 
-  char *buf;
-  do buf = readline("K> ");
-  while (!buf || runcmd(buf, tf) >= 0);
+    char *buf;
+    do buf = readline("K> ");
+    while (!buf || runcmd(buf, tf) >= 0);
 }

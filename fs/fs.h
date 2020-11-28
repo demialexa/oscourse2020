@@ -41,7 +41,7 @@ void file_flush(struct File *f);
 int file_remove(const char *path);
 void fs_sync(void);
 
-/* int	map_block(uint32_t); */
+/* int  map_block(uint32_t); */
 bool block_is_free(uint32_t blockno);
 int alloc_block(void);
 

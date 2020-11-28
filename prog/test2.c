@@ -1,4 +1,3 @@
-#include <inc/lib.h>
 
 int (*volatile cprintf)(const char *fmt, ...);
 void (*volatile sys_yield)(void);
@@ -14,21 +13,20 @@ void (*volatile xc(GRADE3_FAIL, GRADE3_PFX1))(void);
 
 void
 umain(int argc, char **argv) {
-  int test2_i;
-  int test2_j;
+    int test2_i;
+    int test2_j;
 
 #if !defined(GRADE3_TEST)
-  cprintf("TEST2 LOADED.\n");
+    cprintf("TEST2 LOADED.\n");
 #else
-  GRADE3_FUNC(xstr(GRADE3_FUNC)[0]);
-  if (xc(GRADE3_FAIL, GRADE3_PFX1)) {
-    xc(GRADE3_FAIL, GRADE3_PFX1)();
-  }
+    GRADE3_FUNC(xstr(GRADE3_FUNC)[0]);
+    if (xc(GRADE3_FAIL, GRADE3_PFX1)) {
+        xc(GRADE3_FAIL, GRADE3_PFX1)();
+    }
 #endif
 
-  for (test2_j = 0; test2_j < 5; ++test2_j) {
-    for (test2_i = 0; test2_i < 10000; ++test2_i) {
+    for (test2_j = 0; test2_j < 5; ++test2_j) {
+        for (test2_i = 0; test2_i < 10000; ++test2_i);
+        sys_yield();
     }
-    sys_yield();
-  }
 }

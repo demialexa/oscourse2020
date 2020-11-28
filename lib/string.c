@@ -92,20 +92,25 @@ strncmp(const char *p, const char *q, size_t n) {
 }
 
 /* Return a pointer to the first occurrence of 'c' in 's',
- * or a pointer to the string-ending null character if the string has no 'c' */
+ *  * or a null pointer if the string has no 'c' */
 char *
-strfind(const char *str, int ch) {
-    while (*str && *str != ch) str++;
-    return (char *)str;
+strchr(const char *str, int c) {
+    for (; *str; str++) {
+        if (*str == c) {
+            return (char *)str;
+        }
+    }
+    return NULL;
 }
 
 /* Return a pointer to the first occurrence of 'c' in 's',
- * or a null pointer if the string has no 'c' */
+ *  * or a pointer to the string-ending null character if the string has no 'c' */
 char *
-strchr(const char *str, int ch) {
-    while (*str && *str != ch) str++;
-    return *str == ch ? (char *)str : NULL;
+strfind(const char *str, int ch) {
+    for (; *str && *str != ch; str++) /* nothing */;
+    return (char *)str;
 }
+
 
 #if ASM
 void *
@@ -188,16 +193,17 @@ memset(void *v, int c, size_t n) {
 
 void *
 memmove(void *dst, const void *src, size_t n) {
-    char *res = dst;
+    const char *s = src;
+    char *d = dst;
 
-    if (s < dst && s + n > dst) {
-        src += n, dst += n;
-        while (n-- > 0) *--dst = *--src;
+    if (s < (char *)dst && s + n > (char *)dst) {
+        s += n, d += n;
+        while (n-- > 0) *--d = *--s;
     } else {
-        while (n-- > 0) *dst++ = *src++;
+        while (n-- > 0) *d++ = *s++;
     }
 
-    return res;
+    return dst;
 }
 #endif
 

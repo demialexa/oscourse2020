@@ -7,36 +7,37 @@ ENTRY(_start)
 
 SECTIONS
 {
-	/* Load programs at this address: "." means the current address */
-	. = #ADDRESS#;
+    /* Load programs at this address: "." means the current address */
+    . = #ADDRESS#;
 
-	.text : {
-		*(.text .stub .text.* .gnu.linkonce.t.*)
-	}
+    .text : {
+        *(.text .stub .text.* .gnu.linkonce.t.*)
 
-	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
+        . = ALIGN(8);
 
-	.rodata : {
-		*(.rodata .rodata.* .gnu.linkonce.r.* .data.rel.ro.local)
-	}
+        PROVIDE(etext = .); /* Define the 'etext' symbol to this value */
 
-	/* Adjust the address for the data segment to the next page */
-	. = ALIGN(0x1000);
-
-	.data : {
-		*(.data .data.rel.local .got .got.plt)
-	}
-
-	PROVIDE(edata = .);
-
-	.bss : {
-		*(.bss)
-	}
-
-	PROVIDE(end = .);
+        *(.rodata .rodata.* .gnu.linkonce.r.* .data.rel.ro.local)
+    }
 
 
-	/DISCARD/ : {
-		*(.eh_frame .note.GNU-stack .comment)
-	}
+    /* Adjust the address for the data segment to the next page */
+    . = ALIGN(0x1000);
+
+    .data : {
+        *(.data .data.rel.local .got .got.plt)
+    }
+
+    PROVIDE(edata = .);
+
+    .bss : {
+        *(.bss)
+    }
+
+    PROVIDE(end = .);
+
+
+    /DISCARD/ : {
+        *(.interp .eh_frame .note.GNU-stack .comment)
+    }
 }

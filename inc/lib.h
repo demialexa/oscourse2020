@@ -50,6 +50,7 @@ void set_pgfault_handler(void (*handler)(struct UTrapframe *utf));
 char *readline(const char *buf);
 
 /* syscall.c */
+#define CURENVID 0
 void sys_cputs(const char *string, size_t len);
 int sys_cgetc(void);
 envid_t sys_getenvid(void);

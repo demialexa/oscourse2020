@@ -1,4 +1,4 @@
-// buggy program - faults with a write to location zero
+/* Buggy program - faults with a write to location zero */
 
 #include <inc/lib.h>
 

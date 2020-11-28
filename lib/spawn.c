@@ -179,8 +179,6 @@ spawnl(const char *prog, const char *arg0, ...) {
     while (va_arg(vl, void *) != NULL) argc++;
     va_end(vl);
 
-    cprintf(">>>>>>>>>>SPAWN [from %08x]\n", thisenv->env_id);
-
     /* Now that we have the size of the args, do a second pass
     * and store the values in a VLA, which has the format of argv */
     const char *argv[argc + 2];

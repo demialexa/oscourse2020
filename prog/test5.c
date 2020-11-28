@@ -1,5 +1,4 @@
-#include <inc/lib.h>
-#include <inc/x86.h>
+#include <stdint.h>
 #include <inc/random.h>
 
 int (*volatile cprintf)(const char *fmt, ...);
@@ -12,33 +11,33 @@ unsigned int deep = 0;
 
 void
 test_rec(void) {
-  void *buf;
-  ++deep;
+    void *buf;
+    ++deep;
 
-  if (!(rand() % 79)) {
-    sys_yield();
-  }
-
-  buf = test_alloc(rand() % 300);
-  if (buf) {
-    if (deep < 200 && (rand() % 53)) {
-      test_rec();
+    if (!(rand() % 79)) {
+        sys_yield();
     }
-    test_free(buf);
-  } else {
-    if (deep < 200 && (rand() % 17)) {
-      test_rec();
-    }
-  }
 
-  --deep;
-  return;
+    buf = test_alloc(rand() % 300);
+    if (buf) {
+        if (deep < 200 && (rand() % 53)) {
+            test_rec();
+        }
+        test_free(buf);
+    } else {
+        if (deep < 200 && (rand() % 17)) {
+            test_rec();
+        }
+    }
+
+    --deep;
+    return;
 }
 
 void
 umain(int argc, char **argv) {
-  rand_init(4);
-  for (;;) {
-    test_rec();
-  }
+    rand_init(4);
+    for (;;) {
+        test_rec();
+    }
 }

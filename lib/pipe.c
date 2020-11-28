@@ -103,9 +103,8 @@ devpipe_read(struct Fd *fd, void *vbuf, size_t n) {
                 (unsigned long)n, (long)p->p_rpos, (long)p->p_wpos);
     }
 
-    size_t i;
     uint8_t *buf = vbuf;
-    for (i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         while (p->p_rpos == p->p_wpos) /* pipe is empty */ {
             /* If we got any data, return it */
             if (i > 0) return i;
@@ -124,7 +123,7 @@ devpipe_read(struct Fd *fd, void *vbuf, size_t n) {
         p->p_rpos++;
     }
 
-  return i;
+  return n;
 }
 
 static ssize_t
@@ -136,9 +135,8 @@ devpipe_write(struct Fd *fd, const void *vbuf, size_t n) {
                 (unsigned long)n, (long)p->p_rpos, (long)p->p_wpos);
     }
 
-    size_t i;
     const uint8_t *buf = vbuf;
-    for (i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         while (p->p_wpos >= p->p_rpos + sizeof(p->p_buf)) /* pipe is full */ {
             /* If all the readers are gone
              * (it's only writers like us now),
@@ -155,7 +153,7 @@ devpipe_write(struct Fd *fd, const void *vbuf, size_t n) {
         p->p_wpos++;
     }
 
-    return i;
+    return n;
 }
 
 static int

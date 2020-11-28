@@ -42,8 +42,7 @@ __nosan_memset(void *v, int c, size_t n) {
     }
 
     if (ni / 8) {
-        asm volatile("cld; rep stosq\n"
-                     ::"D"(ptr), "a"(k), "c"(ni / 8)
+        asm volatile("cld; rep stosq\n" ::"D"(ptr), "a"(k), "c"(ni / 8)
                      : "cc", "memory");
         ni &= 7;
     }
@@ -63,13 +62,11 @@ __nosan_memcpy(void *dst, const void *src, size_t n) {
     char *d = dst;
 
     if (!(((intptr_t)s & 7) | ((intptr_t)d & 7) | (n & 7))) {
-      asm volatile("cld; rep movsq\n"
-                   ::"D"(d), "S"(s), "c"(n / 8)
-                   : "cc", "memory");
+        asm volatile("cld; rep movsq\n" ::"D"(d), "S"(s), "c"(n / 8)
+                     : "cc", "memory");
     } else {
-      asm volatile("cld; rep movsb\n"
-                   ::"D"(d), "S"(s), "c"(n)
-                   : "cc", "memory");
+        asm volatile("cld; rep movsb\n" ::"D"(d), "S"(s), "c"(n)
+                     : "cc", "memory");
     }
     return dst;
 }
@@ -77,22 +74,22 @@ __nosan_memcpy(void *dst, const void *src, size_t n) {
 #else
 void *
 __nosan_memset(void *src, int c, size_t sz) {
-  /* We absolutely must implement this for ASAN functioning. */
-  volatile char *vptr = (volatile char *)(src);
-  while (sz--) {
-    *vptr++ = c;
-  }
-  return src;
+    /* We absolutely must implement this for ASAN functioning. */
+    volatile char *vptr = (volatile char *)(src);
+    while (sz--) {
+        *vptr++ = c;
+    }
+    return src;
 }
 
 void *
 __nosan_memcpy(void *dst, const void *src, size_t sz) {
-  uint8_t *d = (uint8_t *)dst;
-  uint8_t *s = (uint8_t *)src;
+    uint8_t *d = (uint8_t *)dst;
+    uint8_t *s = (uint8_t *)src;
 
-  for (size_t i = 0; i < sz; i++)
-    d[i] = s[i];
+    for (size_t i = 0; i < sz; i++)
+        d[i] = s[i];
 
-  return dst;
+    return dst;
 }
 #endif

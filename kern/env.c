@@ -84,63 +84,63 @@ struct Pseudodesc gdt_pd = { sizeof(gdt) - 1, (unsigned long)gdt };
  *   On error, sets *env_store to NULL. */
 int
 envid2env(envid_t envid, struct Env **env_store, bool need_check_perm) {
-  struct Env *env;
+    struct Env *env;
 
-  /* If envid is zero, return the current environment. */
-  if (!envid) {
-    *env_store = curenv;
+    /* If envid is zero, return the current environment. */
+    if (!envid) {
+        *env_store = curenv;
+        return 0;
+    }
+
+    /* Look up the Env structure via the index part of the envid,
+     * then check the env_id field in that struct Env
+     * to ensure that the envid is not stale
+     * (i.e., does not refer to a _previous_ environment
+     * that used the same slot in the envs[] array). */
+    env = &envs[ENVX(envid)];
+    if (env->env_status == ENV_FREE || env->env_id != envid) {
+        *env_store = NULL;
+        return -E_BAD_ENV;
+    }
+
+    /* Check that the calling environment has legitimate permission
+     * to manipulate the specified environment.
+     * If checkperm is set, the specified environment
+     * must be either the current environment
+     * or an immediate child of the current environment. */
+    if (need_check_perm && env != curenv && env->env_parent_id != curenv->env_id) {
+        *env_store = NULL;
+        return -E_BAD_ENV;
+    }
+
+    *env_store = env;
     return 0;
-  }
-
-  /* Look up the Env structure via the index part of the envid,
-   * then check the env_id field in that struct Env
-   * to ensure that the envid is not stale
-   * (i.e., does not refer to a _previous_ environment
-   * that used the same slot in the envs[] array). */
-  env = &envs[ENVX(envid)];
-  if (env->env_status == ENV_FREE || env->env_id != envid) {
-    *env_store = NULL;
-    return -E_BAD_ENV;
-  }
-
-  /* Check that the calling environment has legitimate permission
-   * to manipulate the specified environment.
-   * If checkperm is set, the specified environment
-   * must be either the current environment
-   * or an immediate child of the current environment. */
-  if (need_check_perm && env != curenv && env->env_parent_id != curenv->env_id) {
-    *env_store = NULL;
-    return -E_BAD_ENV;
-  }
-
-  *env_store = env;
-  return 0;
 }
 
 /* Load GDT and segment descriptors. */
 static void
 env_init_percpu(void) {
-  lgdt(&gdt_pd);
+    lgdt(&gdt_pd);
 
-  /* The kernel never uses GS or FS,
-   * so we leave those set to the user data segment
-   *
-   * For good measure, clear the local descriptor table (LDT),
-   * since we don't use it */
-  asm volatile("movw %%dx,%%gs\n\t"
-               "movw %%dx,%%fs\n\t"
-               "movw %%ax,%%es\n\t"
-               "movw %%ax,%%ds\n\t"
-               "movw %%ax,%%ss\n\t"
-               "xorl %%eax,%%eax\n\t"
-               "lldt %%ax\n\t"
-               "pushq %%rcx\n\t"
-               "movabs $1f,%%rax\n\t"
-               "pushq %%rax\n\t"
-               "lretq\n"
-            "1:\n"
-               :: "a"(GD_KD), "d"(GD_UD | 3), "c"(GD_KT)
-               : "cc", "memory");
+    /* The kernel never uses GS or FS,
+     * so we leave those set to the user data segment
+     *
+     * For good measure, clear the local descriptor table (LDT),
+     * since we don't use it */
+    asm volatile(
+        "movw %%dx,%%gs\n\t"
+        "movw %%dx,%%fs\n\t"
+        "movw %%ax,%%es\n\t"
+        "movw %%ax,%%ds\n\t"
+        "movw %%ax,%%ss\n\t"
+        "xorl %%eax,%%eax\n\t"
+        "lldt %%ax\n\t"
+        "pushq %%rcx\n\t"
+        "movabs $1f,%%rax\n\t"
+        "pushq %%rax\n\t"
+        "lretq\n"
+    "1:\n"
+        :: "a"(GD_KD), "d"(GD_UD | 3), "c"(GD_KT) : "cc", "memory");
 }
 
 /* Mark all environments in 'envs' as free, set their env_ids to 0,
@@ -151,18 +151,18 @@ env_init_percpu(void) {
  */
 void
 env_init(void) {
-  /* Set up envs array */
+    /* Set up envs array */
 
-  // LAB 3: Your code here.
-  env_free_list = NULL;
-  for (int i = NENV - 1; i >= 0; i--) {
-    envs[i].env_link = env_free_list;
-    envs[i].env_id = 0;
-    env_free_list = &envs[i];
-  }
+    // LAB 3: Your code here
+    env_free_list = NULL;
+    for (int i = NENV - 1; i >= 0; i--) {
+        envs[i].env_link = env_free_list;
+        envs[i].env_id = 0;
+        env_free_list = &envs[i];
+    }
 
-  /* Init CPU context */
-  env_init_percpu();
+    /* Init CPU context */
+    env_init_percpu();
 }
 
 /* Allocate len bytes of physical memory for environment env,
@@ -172,29 +172,30 @@ env_init(void) {
  * Panic if any allocation attempt fails. */
 static int
 region_alloc(struct Env *env, void *va, size_t len) {
-  // LAB 8: Your code here:
-  /* (But only if you need it for load_icode.)
-   *
-   * Hint: It is easier to use region_alloc if the caller can pass
-   *   'va' and 'len' values that are not page-aligned.
-   *   You should round va down, and round (va + len) up.
-   *   (Watch out for corner-cases!) */
+    /* (But only if you need it for load_icode.)
+     *
+     * Hint: It is easier to use region_alloc if the caller can pass
+     *   'va' and 'len' values that are not page-aligned.
+     *   You should round va down, and round (va + len) up.
+     *   (Watch out for corner-cases!) */
 
-  void *end = ROUNDUP(va + len, PAGE_SIZE);
-  va = ROUNDDOWN(va, PAGE_SIZE);
-  cprintf ("region: %p %lu -> %p\n", va, end - va, end);
+    // LAB 8: Your code here
 
-  while (va < end) {
-      struct PageInfo *pi = page_alloc(0);
-      if (!pi) return -E_NO_MEM;
-      int res = page_insert(env->env_pagetable, pi, va, PTE_U | PTE_W);
-      if (res < 0) return res;
+    void *end = ROUNDUP(va + len, PAGE_SIZE);
+    va = ROUNDDOWN(va, PAGE_SIZE);
+    cprintf ("region: %p %lu -> %p\n", va, end - va, end);
 
-      page_decref(pi);
-      va += PAGE_SIZE;
-  }
+    while (va < end) {
+        struct PageInfo *pi = page_alloc(0);
+        if (!pi) return -E_NO_MEM;
+        int res = page_insert(env->env_pagetable, pi, va, PTE_U | PTE_W);
+        if (res < 0) return res;
 
-  return 0;
+        page_decref(pi);
+        va += PAGE_SIZE;
+    }
+
+    return 0;
 }
 
 /* Initialize the kernel virtual memory layout for environment e.
@@ -207,48 +208,47 @@ region_alloc(struct Env *env, void *va, size_t len) {
  *  -E_NO_MEM if page directory or table could not be allocated. */
 static int
 env_setup_vm(struct Env *env) {
+    /* Now, set e->env_pgdir and initialize the page directory.
+     *
+     * Hint:
+     *    - The VA space of all envs is identical above UTOP
+     *    (except at UVPT, which we've set below).
+     *    See inc/memlayout.h for permissions and layout.
+     *    Can you use kern_pgdir as a template?  Hint: Yes.
+     *    (Make sure you got the permissions right in Lab 7.)
+     *    - The initial VA below UTOP is empty.
+     *    - You do not need to make any more calls to page_alloc.
+     *    - Note: In general, pp_ref is not maintained for
+     *    physical pages mapped only above UTOP, but env_pgdir
+     *    is an exception -- you need to increment env_pgdir's
+     *    pp_ref for env_free to work correctly.
+     *    - The functions in kern/pmap.h are handy. */
 
-  /* Now, set e->env_pgdir and initialize the page directory.
-   *
-   * Hint:
-   *    - The VA space of all envs is identical above UTOP
-   *    (except at UVPT, which we've set below).
-   *    See inc/memlayout.h for permissions and layout.
-   *    Can you use kern_pgdir as a template?  Hint: Yes.
-   *    (Make sure you got the permissions right in Lab 7.)
-   *    - The initial VA below UTOP is empty.
-   *    - You do not need to make any more calls to page_alloc.
-   *    - Note: In general, pp_ref is not maintained for
-   *    physical pages mapped only above UTOP, but env_pgdir
-   *    is an exception -- you need to increment env_pgdir's
-   *    pp_ref for env_free to work correctly.
-   *    - The functions in kern/pmap.h are handy. */
+    // LAB 8: Your code here:
 
-  // LAB 8: Your code here:
-
-  /* Allocate a page for the page directory */
-  struct PageInfo *pi = page_alloc(0);
-  if (!pi) return -E_NO_MEM;
+    /* Allocate a page for the page directory */
+    struct PageInfo *pi = page_alloc(0);
+    if (!pi) return -E_NO_MEM;
 
 #define NUSERPML4 1
 
-  /* page table pp_ref */
-  for (size_t i = NUSERPML4; i < PML4_ENTRY_COUNT; i++)
-    if (kern_pml4e[i] & PTE_P && i != PML4_INDEX(UVPT))
-      pa2page(PTE_ADDR(kern_pml4e[i]))->pp_ref++;
+    /* page table pp_ref */
+    for (size_t i = NUSERPML4; i < PML4_ENTRY_COUNT; i++)
+        if (kern_pml4[i] & PTE_P && i != PML4_INDEX(UVPT))
+            pa2page(PTE_ADDR(kern_pml4[i]))->pp_ref++;
 
 
-  env->env_pagetable = page2kva(pi);
-  env->env_cr3 = page2pa(pi);
+    env->env_pagetable = page2kva(pi);
+    env->env_cr3 = page2pa(pi);
 
-  /* Share pages between kernel space and userspace */
-  memcpy(env->env_pagetable + NUSERPML4, kern_pml4e + NUSERPML4,
-          PAGE_SIZE - NUSERPML4 * sizeof(pml4e_t));
-  memset(env->env_pagetable, 0, NUSERPML4 * sizeof(pml4e_t));
+    /* Share pages between kernel space and userspace */
+    memcpy(env->env_pagetable + NUSERPML4, kern_pml4 + NUSERPML4,
+           PAGE_SIZE - NUSERPML4 * sizeof(pml4e_t));
+    memset(env->env_pagetable, 0, NUSERPML4 * sizeof(pml4e_t));
 
-  env->env_pagetable[PML4_INDEX(UVPT)] = env->env_cr3 | PTE_P | PTE_U;
+    env->env_pagetable[PML4_INDEX(UVPT)] = env->env_cr3 | PTE_P | PTE_U;
 
-  return 0;
+    return 0;
 }
 
 /* Allocates and initializes a new environment.
@@ -263,80 +263,78 @@ env_setup_vm(struct Env *env) {
 int
 env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
 
-  struct Env *env;
-  if (!(env = env_free_list))
-    return -E_NO_FREE_ENV;
+    struct Env *env;
+    if (!(env = env_free_list))
+      return -E_NO_FREE_ENV;
 
-  /* Allocate and set up the page directory for this environment. */
-  int res = env_setup_vm(env);
-  if (res < 0) return res;
+    /* Allocate and set up the page directory for this environment. */
+    int res = env_setup_vm(env);
+    if (res < 0) return res;
 
-  /* Generate an env_id for this environment */
-  int32_t generation = (env->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
-  /* Don't create a negative env_id */
-  if (generation <= 0) generation = 1 << ENVGENSHIFT;
-  env->env_id = generation | (env - envs);
+    /* Generate an env_id for this environment */
+    int32_t generation = (env->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
+    /* Don't create a negative env_id */
+    if (generation <= 0) generation = 1 << ENVGENSHIFT;
+    env->env_id = generation | (env - envs);
 
-  /* Set the basic status variables */
-  env->env_parent_id = parent_id;
+    /* Set the basic status variables */
+    env->env_parent_id = parent_id;
 #ifdef CONFIG_KSPACE
-  env->env_type = ENV_TYPE_KERNEL;
+    env->env_type = ENV_TYPE_KERNEL;
 #else
-  env->env_type = type;
+    env->env_type = type;
 #endif
-  env->env_status = ENV_RUNNABLE;
-  env->env_runs = 0;
+    env->env_status = ENV_RUNNABLE;
+    env->env_runs = 0;
 
-  /* Clear out all the saved register state,
-   * to prevent the register values
-   * of a prior environment inhabiting this Env structure
-   * from "leaking" into our new environment */
-  memset(&env->env_tf, 0, sizeof(env->env_tf));
+    /* Clear out all the saved register state,
+     * to prevent the register values
+     * of a prior environment inhabiting this Env structure
+     * from "leaking" into our new environment */
+    memset(&env->env_tf, 0, sizeof(env->env_tf));
 
-  /* Set up appropriate initial values for the segment registers.
-   * GD_UD is the user data (KD - kernel data) segment selector in the GDT, and
-   * GD_UT is the user text (KT - kernel text) segment selector (see inc/memlayout.h).
-   * The low 2 bits of each segment register contains the
-   * Requestor Privilege Level (RPL); 3 means user mode, 0 - kernel mode.  When
-   * we switch privilege levels, the hardware does various
-   * checks involving the RPL and the Descriptor Privilege Level
-   * (DPL) stored in the descriptors themselves */
-
+    /* Set up appropriate initial values for the segment registers.
+     * GD_UD is the user data (KD - kernel data) segment selector in the GDT, and
+     * GD_UT is the user text (KT - kernel text) segment selector (see inc/memlayout.h).
+     * The low 2 bits of each segment register contains the
+     * Requestor Privilege Level (RPL); 3 means user mode, 0 - kernel mode.  When
+     * we switch privilege levels, the hardware does various
+     * checks involving the RPL and the Descriptor Privilege Level
+     * (DPL) stored in the descriptors themselves */
 
 #ifdef CONFIG_KSPACE
-  e->env_tf.tf_ds = GD_KD | 0;
-  e->env_tf.tf_es = GD_KD | 0;
-  e->env_tf.tf_ss = GD_KD | 0;
-  e->env_tf.tf_cs = GD_KT | 0;
+    e->env_tf.tf_ds = GD_KD;
+    e->env_tf.tf_es = GD_KD;
+    e->env_tf.tf_ss = GD_KD;
+    e->env_tf.tf_cs = GD_KT;
 
-  // LAB 3: Your code here:
-  static uintptr_t stack_top = 0x2000000;
-  env->env_tf.tf_rsp = stack_top;
-  stack_top -= USTACKSIZE;
+    // LAB 3: Your code here:
+    static uintptr_t stack_top = 0x2000000;
+    env->env_tf.tf_rsp = stack_top;
+    stack_top -= USTACKSIZE;
 #else
-  env->env_tf.tf_ds  = GD_UD | 3;
-  env->env_tf.tf_es  = GD_UD | 3;
-  env->env_tf.tf_ss  = GD_UD | 3;
-  env->env_tf.tf_cs  = GD_UT | 3;
-  env->env_tf.tf_rsp = USTACKTOP;
+    env->env_tf.tf_ds  = GD_UD | 3;
+    env->env_tf.tf_es  = GD_UD | 3;
+    env->env_tf.tf_ss  = GD_UD | 3;
+    env->env_tf.tf_cs  = GD_UT | 3;
+    env->env_tf.tf_rsp = USTACKTOP;
 #endif
 
-  /* For now init trapframe with IF set */
-  env->env_tf.tf_rflags = FL_IF | (type == ENV_TYPE_FS ? FL_IOPL_3 : FL_IOPL_0);
+    /* For now init trapframe with IF set */
+    env->env_tf.tf_rflags = FL_IF | (type == ENV_TYPE_FS ? FL_IOPL_3 : FL_IOPL_0);
 
+    /* Clear the page fault handler until user installs one. */
+    env->env_pgfault_upcall = 0;
 
-  /* Clear the page fault handler until user installs one. */
-  env->env_pgfault_upcall = 0;
+    /* Also clear the IPC receiving flag. */
+    env->env_ipc_recving = 0;
 
-  /* Also clear the IPC receiving flag. */
-  env->env_ipc_recving = 0;
+    /* Commit the allocation */
+    env_free_list = env->env_link;
+    *newenv_store = env;
 
-  /* Commit the allocation */
-  env_free_list = env->env_link;
-  *newenv_store = env;
-
-  cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, env->env_id);
-  return 0;
+    cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, env->env_id);
+    return 0;
 }
 
 static int
@@ -345,105 +343,105 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
 
   /* NOTE: find_function from kdebug.c should be used */
 
-  struct Elf *elf = (struct Elf *)binary;
-  struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
-  const char *shstr = (char *)binary + sh[elf->e_shstrndx].sh_offset;
+    struct Elf *elf = (struct Elf *)binary;
+    struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
+    const char *shstr = (char *)binary + sh[elf->e_shstrndx].sh_offset;
 
-  if ((uint8_t *)(shstr + sh[elf->e_shstrndx].sh_size) > binary + size) {
-    cprintf("String table exceeds file contents: %lu > %lu\n",
-            (unsigned long)((uint8_t *)shstr - binary), (unsigned long)size);
-    return -E_INVALID_EXE;
-  }
-
-  /* Find string table */
-  size_t strtab = -1UL;
-  for (size_t i = 0; i < elf->e_shnum; i++) {
-    if (sh[i].sh_name > sh[elf->e_shstrndx].sh_size) {
-      cprintf("String table exceeds string table: %lu > %lu\n",
-              (unsigned long)sh[i].sh_name, (unsigned long)sh[elf->e_shstrndx].sh_size);
-      return -E_INVALID_EXE;
+    if ((uint8_t *)(shstr + sh[elf->e_shstrndx].sh_size) > binary + size) {
+        cprintf("String table exceeds file contents: %lu > %lu\n",
+                (unsigned long)((uint8_t *)shstr - binary), (unsigned long)size);
+        return -E_INVALID_EXE;
     }
 
-    if (sh[i].sh_type == ELF_SHT_STRTAB && !strcmp(".strtab", shstr + sh[i].sh_name)) {
-      strtab = i;
-      break;
-    }
-  }
-
-  if (strtab == -1UL) {
-    cprintf("String table is absent\n");
-    return 0;
-  }
-
-  const char *strings = (char *)binary + sh[strtab].sh_offset;
-
-  if ((uint8_t *)(strings + sh[strtab].sh_size) > binary + size) {
-    cprintf("String table exceeds file contents: %lu > %lu\n",
-            (unsigned long)((uint8_t *)strings + sh[strtab].sh_size - binary), (unsigned long)size);
-    return -E_INVALID_EXE;
-  }
-
-  if (!sh[strtab].sh_size) {
-    cprintf("String table is empty\n");
-    return -E_INVALID_EXE;
-  }
-
-  if (binary[sh[strtab].sh_offset + sh[strtab].sh_size - 1]) {
-    cprintf("String table is not NUL-terminated\n");
-    return -E_INVALID_EXE;
-  }
-
-  for (size_t i = 0; i < elf->e_shnum; i++) {
-    if (sh[i].sh_type == ELF_SHT_SYMTAB) {
-
-      struct Elf64_Sym *syms = (struct Elf64_Sym *)(binary + sh[i].sh_offset);
-
-      if (sh[i].sh_offset + sh[i].sh_size > size) {
-        cprintf("Symbol table exceeds file contents: %lu > %lu\n",
-                (unsigned long)(sh[i].sh_offset + sh[i].sh_size), (unsigned long)size);
-        return -E_INVALID_EXE;
-      }
-
-      if (sh[i].sh_entsize != sizeof(*syms)) {
-        cprintf("Unexpected symbol size: %lu\nShould be: %lu\n",
-                (unsigned long)sh[i].sh_entsize, (unsigned long)sizeof(*syms));
-        return -E_INVALID_EXE;
-      }
-
-      size_t nsyms = sh[i].sh_size / sizeof(*syms);
-
-      for (size_t j = 0; j < nsyms; j++) {
-        /* Only handle symbols that we know how to bind */
-        if (ELF64_ST_BIND(syms[j].st_info) == STB_GLOBAL &&
-            ELF64_ST_TYPE(syms[j].st_info) == STT_OBJECT &&
-            syms[j].st_other == STV_DEFAULT &&
-            syms[j].st_size == sizeof(void (*)())) {
-
-          const char *name = strings + syms[j].st_name;
-
-          if (name > strings + sh[strtab].sh_size) {
-            cprintf("String table exceeds string table: %lu > %lu\n",
-                    (unsigned long)syms[j].st_name, (unsigned long)sh[strtab].sh_size);
-            return -E_INVALID_EXE;
-          }
-
-          if (syms[j].st_value < image_start || syms[j].st_value > image_end) {
-            cprintf("Symbol value points outside program image: %p\n",
-                    (uint8_t *)syms[j].st_value);
-            return -E_INVALID_EXE;
-          }
-
-          uintptr_t addr = find_function(name);
-          if (addr) {
-            cprintf("Bind function '%s' to %p\n", name, (void *)addr);
-            void (*tmp)() = (void (*)())addr;
-            memcpy((void (*)())syms[j].st_value, &tmp, sizeof(void (*)()));
-          }
+    /* Find string table */
+    size_t strtab = -1UL;
+    for (size_t i = 0; i < elf->e_shnum; i++) {
+        if (sh[i].sh_name > sh[elf->e_shstrndx].sh_size) {
+          cprintf("String table exceeds string table: %lu > %lu\n",
+                  (unsigned long)sh[i].sh_name, (unsigned long)sh[elf->e_shstrndx].sh_size);
+          return -E_INVALID_EXE;
         }
-      }
+
+        if (sh[i].sh_type == ELF_SHT_STRTAB && !strcmp(".strtab", shstr + sh[i].sh_name)) {
+            strtab = i;
+            break;
+        }
     }
-  }
-  return 0;
+
+    if (strtab == -1UL) {
+        cprintf("String table is absent\n");
+        return 0;
+    }
+
+    const char *strings = (char *)binary + sh[strtab].sh_offset;
+
+    if ((uint8_t *)(strings + sh[strtab].sh_size) > binary + size) {
+        cprintf("String table exceeds file contents: %lu > %lu\n",
+                (unsigned long)((uint8_t *)strings + sh[strtab].sh_size - binary), (unsigned long)size);
+        return -E_INVALID_EXE;
+    }
+
+    if (!sh[strtab].sh_size) {
+        cprintf("String table is empty\n");
+        return -E_INVALID_EXE;
+    }
+
+    if (binary[sh[strtab].sh_offset + sh[strtab].sh_size - 1]) {
+        cprintf("String table is not NUL-terminated\n");
+        return -E_INVALID_EXE;
+    }
+
+    for (size_t i = 0; i < elf->e_shnum; i++) {
+        if (sh[i].sh_type == ELF_SHT_SYMTAB) {
+
+            struct Elf64_Sym *syms = (struct Elf64_Sym *)(binary + sh[i].sh_offset);
+
+            if (sh[i].sh_offset + sh[i].sh_size > size) {
+                cprintf("Symbol table exceeds file contents: %lu > %lu\n",
+                        (unsigned long)(sh[i].sh_offset + sh[i].sh_size), (unsigned long)size);
+                return -E_INVALID_EXE;
+            }
+
+            if (sh[i].sh_entsize != sizeof(*syms)) {
+                cprintf("Unexpected symbol size: %lu\nShould be: %lu\n",
+                        (unsigned long)sh[i].sh_entsize, (unsigned long)sizeof(*syms));
+                return -E_INVALID_EXE;
+            }
+
+            size_t nsyms = sh[i].sh_size / sizeof(*syms);
+
+            for (size_t j = 0; j < nsyms; j++) {
+                /* Only handle symbols that we know how to bind */
+                if (ELF64_ST_BIND(syms[j].st_info) == STB_GLOBAL &&
+                    ELF64_ST_TYPE(syms[j].st_info) == STT_OBJECT &&
+                    syms[j].st_other == STV_DEFAULT &&
+                    syms[j].st_size == sizeof(void (*)())) {
+
+                    const char *name = strings + syms[j].st_name;
+
+                    if (name > strings + sh[strtab].sh_size) {
+                        cprintf("String table exceeds string table: %lu > %lu\n",
+                                (unsigned long)syms[j].st_name, (unsigned long)sh[strtab].sh_size);
+                        return -E_INVALID_EXE;
+                    }
+
+                    if (syms[j].st_value < image_start || syms[j].st_value > image_end) {
+                        cprintf("Symbol value points outside program image: %p\n",
+                                (uint8_t *)syms[j].st_value);
+                        return -E_INVALID_EXE;
+                    }
+
+                    uintptr_t addr = find_function(name);
+                    if (addr) {
+                        cprintf("Bind function '%s' to %p\n", name, (void *)addr);
+                        void (*tmp)() = (void (*)())addr;
+                        memcpy((void (*)())syms[j].st_value, &tmp, sizeof(void (*)()));
+                    }
+                }
+            }
+        }
+    }
+    return 0;
 }
 
 #ifdef SANITIZE_USER_SHADOW_BASE
@@ -452,17 +450,17 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
 struct PageInfo *uvpt_pages = NULL;
 void
 uvpt_shadow_map(struct Env *e) {
-  uintptr_t va = ROUNDDOWN((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE, PAGE_SIZE);
-  uintptr_t vend = ROUNDUP((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PAGE_SIZE);
+    uintptr_t va = ROUNDDOWN((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE, PAGE_SIZE);
+    uintptr_t vend = ROUNDUP((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PAGE_SIZE);
 
-  for (struct PageInfo **link = &uvpt_pages; va < vend; va += PAGE_SIZE) {
-    if (!*link) *link = page_alloc(ALLOC_ZERO);
+    for (struct PageInfo **link = &uvpt_pages; va < vend; va += PAGE_SIZE) {
+        if (!*link) *link = page_alloc(ALLOC_ZERO);
 
-    int res = page_insert(e->env_pagetable, *link, (void *)va, PTE_U | PTE_W);
-    if (res < 0) panic("Cannot allocate any memory for uvpt shadow mem");
+        int res = page_insert(e->env_pagetable, *link, (void *)va, PTE_U | PTE_W);
+        if (res < 0) panic("Cannot allocate any memory for uvpt shadow mem");
 
-    link = &(*link)->pp_link;
-  }
+        link = &(*link)->pp_link;
+    }
 }
 #endif
 
@@ -516,172 +514,172 @@ uvpt_shadow_map(struct Env *e) {
  *   What?  (See env_run() and env_pop_tf() below.) */
 static int
 load_icode(struct Env *env, uint8_t *binary, size_t size) {
-  // LAB 3: Your code here:
-  // LAB 8: Your code here:
+    // LAB 3: Your code here
+    // LAB 8: Your code here
 
-  if (size < sizeof(struct Elf)) {
-    cprintf("Elf file is too small: %lu\n", size);
-    return -E_INVALID_EXE;
-  }
+    if (size < sizeof(struct Elf)) {
+        cprintf("Elf file is too small: %lu\n", size);
+        return -E_INVALID_EXE;
+    }
 
-  struct Elf *elf = (struct Elf *)binary;
-  if (elf->e_magic != ELF_MAGIC ||
-      elf->e_elf[0] != 2 /* 64-bit */ ||
-      elf->e_elf[1] != 1 /* little endian */ ||
-      elf->e_elf[2] != 1 /* version 1 */ ||
-      elf->e_type != ET_EXEC /* executable */ ||
-      elf->e_machine != 0x3E /* amd64 */) {
-    cprintf("Unexpected ELF format\n");
-    return -E_INVALID_EXE;
-  }
+    struct Elf *elf = (struct Elf *)binary;
+    if (elf->e_magic != ELF_MAGIC ||
+            elf->e_elf[0] != 2 /* 64-bit */ ||
+            elf->e_elf[1] != 1 /* little endian */ ||
+            elf->e_elf[2] != 1 /* version 1 */ ||
+            elf->e_type != ET_EXEC /* executable */ ||
+            elf->e_machine != 0x3E /* amd64 */) {
+        cprintf("Unexpected ELF format\n");
+        return -E_INVALID_EXE;
+    }
 
-  if (elf->e_ehsize < (sizeof(struct Elf))) {
-    cprintf("ELF header is too smal: %u \nShould be at least %u\n",
-            (unsigned)elf->e_ehsize, (unsigned)sizeof(struct Elf));
-    return -E_INVALID_EXE;
-  }
+    if (elf->e_ehsize < (sizeof(struct Elf))) {
+        cprintf("ELF header is too smal: %u \nShould be at least %u\n",
+                (unsigned)elf->e_ehsize, (unsigned)sizeof(struct Elf));
+        return -E_INVALID_EXE;
+    }
 
-  if (elf->e_shentsize != sizeof(struct Secthdr)) {
-    cprintf("Unexpected section header size %u\n Should be %u\n",
-            (unsigned)elf->e_shentsize, (unsigned)sizeof(struct Secthdr));
-    return -E_INVALID_EXE;
-  }
+    if (elf->e_shentsize != sizeof(struct Secthdr)) {
+        cprintf("Unexpected section header size %u\n Should be %u\n",
+                (unsigned)elf->e_shentsize, (unsigned)sizeof(struct Secthdr));
+        return -E_INVALID_EXE;
+    }
 
-  if (elf->e_phentsize != sizeof(struct Proghdr)) {
-    cprintf("Unexpected program header size %u\n Should be %u\n",
-            (unsigned)elf->e_phentsize, (unsigned)sizeof(struct Proghdr));
-    return -E_INVALID_EXE;
-  }
+    if (elf->e_phentsize != sizeof(struct Proghdr)) {
+        cprintf("Unexpected program header size %u\n Should be %u\n",
+                (unsigned)elf->e_phentsize, (unsigned)sizeof(struct Proghdr));
+        return -E_INVALID_EXE;
+    }
 
-  if (elf->e_shstrndx >= elf->e_shnum) {
-    cprintf("Unexpected string section %u overflows total number of sections %u\n",
-            (unsigned)elf->e_shstrndx, (unsigned)elf->e_shnum);
-    return -E_INVALID_EXE;
-  }
+    if (elf->e_shstrndx >= elf->e_shnum) {
+        cprintf("Unexpected string section %u overflows total number of sections %u\n",
+                (unsigned)elf->e_shstrndx, (unsigned)elf->e_shnum);
+        return -E_INVALID_EXE;
+    }
 
-  struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
-  if ((uint8_t *)(sh + elf->e_shnum) > binary + size) {
-    cprintf("Section table exceeds file contents: %lu > %lu\n",
-            (unsigned long)((uint8_t *)(sh + elf->e_shnum) - binary), size);
-    return -E_INVALID_EXE;
-  }
-  if (sh[elf->e_shstrndx].sh_type != ELF_SHT_STRTAB) {
-    cprintf("String table section index points to section of other type %d\n",
-            (unsigned)sh->sh_type);
-    return -E_INVALID_EXE;
-  }
-  if (sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size > size) {
-    cprintf("String table size exceeds file size: %lu > %lu\n",
-            (unsigned long)(sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size), (unsigned long)size);
-    return -E_INVALID_EXE;
-  }
-  if (!sh[elf->e_shstrndx].sh_size) {
-    cprintf("String table is empty\n");
-    return -E_INVALID_EXE;
-  }
-  if (binary[sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size - 1]) {
-    cprintf("String table is not NUL-terminated\n");
-    return -E_INVALID_EXE;
-  }
+    struct Secthdr *sh = (struct Secthdr *)(binary + elf->e_shoff);
+    if ((uint8_t *)(sh + elf->e_shnum) > binary + size) {
+        cprintf("Section table exceeds file contents: %lu > %lu\n",
+                (unsigned long)((uint8_t *)(sh + elf->e_shnum) - binary), size);
+        return -E_INVALID_EXE;
+    }
+    if (sh[elf->e_shstrndx].sh_type != ELF_SHT_STRTAB) {
+        cprintf("String table section index points to section of other type %d\n",
+                (unsigned)sh->sh_type);
+        return -E_INVALID_EXE;
+    }
+    if (sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size > size) {
+        cprintf("String table size exceeds file size: %lu > %lu\n",
+                (unsigned long)(sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size), (unsigned long)size);
+        return -E_INVALID_EXE;
+    }
+    if (!sh[elf->e_shstrndx].sh_size) {
+        cprintf("String table is empty\n");
+        return -E_INVALID_EXE;
+    }
+    if (binary[sh[elf->e_shstrndx].sh_offset + sh[elf->e_shstrndx].sh_size - 1]) {
+        cprintf("String table is not NUL-terminated\n");
+        return -E_INVALID_EXE;
+    }
 
-  struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
-  if ((uint8_t *)(ph + elf->e_phnum) > binary + size) {
-    cprintf("Program header table exceeds file contents: %lu > %lu\n",
-            (unsigned long)((uint8_t *)(ph + elf->e_phnum) - binary), size);
-    return -E_INVALID_EXE;
-  }
+    struct Proghdr *ph = (struct Proghdr *)(binary + elf->e_phoff);
+    if ((uint8_t *)(ph + elf->e_phnum) > binary + size) {
+        cprintf("Program header table exceeds file contents: %lu > %lu\n",
+                (unsigned long)((uint8_t *)(ph + elf->e_phnum) - binary), size);
+        return -E_INVALID_EXE;
+    }
 
-  /* Allocate stack for new task */
-  int res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
-  if (res < 0) return res;
+    /* Allocate stack for new task */
+    int res = region_alloc(env, (void *)(USTACKTOP - USTACKSIZE), USTACKSIZE);
+    if (res < 0) return res;
 
 #ifdef SANITIZE_USER_SHADOW_BASE
-  void uvpt_shadow_map(struct Env *e);
-  uvpt_shadow_map(env);
-  res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
-  if (res < 0) return res;
-  res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
-  if (res < 0) return res;
+    void uvpt_shadow_map(struct Env *e);
+    uvpt_shadow_map(env);
+    res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
+    if (res < 0) return res;
+    res = region_alloc(env, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
+    if (res < 0) return res;
+    res = region_alloc(env, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
+    if (res < 0) return res;
+    res = region_alloc(env, (void *)SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
+    if (res < 0) return res;
 #endif
 
-  uintptr_t min_addr = UTOP, max_addr = 0;
-  for (size_t i = 0; i < elf->e_phnum; i++) {
-    if (ph[i].p_type == ELF_PROG_LOAD) {
+    uintptr_t min_addr = UTOP, max_addr = 0;
+    for (size_t i = 0; i < elf->e_phnum; i++) {
+        if (ph[i].p_type == ELF_PROG_LOAD) {
 
-      min_addr = MIN(min_addr, ph[i].p_va);
-      max_addr = MAX(max_addr, ph[i].p_va + ph[i].p_memsz);
+            min_addr = MIN(min_addr, ph[i].p_va);
+            max_addr = MAX(max_addr, ph[i].p_va + ph[i].p_memsz);
 
-      void *src = binary + ph[i].p_offset;
-      void *dst = (void *)ph[i].p_va;
+            void *src = binary + ph[i].p_offset;
+            void *dst = (void *)ph[i].p_va;
 
-      size_t memsz  = ph[i].p_memsz;
-      size_t filesz = MIN(ph[i].p_filesz, memsz);
+            size_t memsz  = ph[i].p_memsz;
+            size_t filesz = MIN(ph[i].p_filesz, memsz);
 
-      if ((uint8_t *)src + filesz > binary + size) {
-        cprintf("Section contents exceeds file size: %lu > %lu\n",
-                (unsigned long)((uint8_t *)(src + filesz) - binary), size);
-        return -E_INVALID_EXE;
-      }
+            if ((uint8_t *)src + filesz > binary + size) {
+                cprintf("Section contents exceeds file size: %lu > %lu\n",
+                        (unsigned long)((uint8_t *)(src + filesz) - binary), size);
+                return -E_INVALID_EXE;
+            }
 
-      if ((uintptr_t)dst + memsz > UTOP) {
-        cprintf("Section contents exceeds user memory: %p > %p\n", (dst + memsz), (void *)UTOP);
-        return -E_INVALID_EXE;
-      }
+            if ((uintptr_t)dst + memsz > UTOP) {
+                cprintf("Section contents exceeds user memory: %p > %p\n", (dst + memsz), (void *)UTOP);
+                return -E_INVALID_EXE;
+            }
 
-      cprintf("Loading section of size 0x%08lX/0x%08lX to %p...\n",
-          (unsigned long)filesz, (unsigned long)memsz, dst);
+            cprintf("Loading section of size 0x%08lX/0x%08lX to %p...\n",
+                (unsigned long)filesz, (unsigned long)memsz, dst);
 
-      if (region_alloc(env, dst, memsz)) {
-        cprintf("Out of memory\n");
-        return -E_NO_MEM;
-      }
+            if (region_alloc(env, dst, memsz)) {
+                cprintf("Out of memory\n");
+                return -E_NO_MEM;
+            }
+        }
     }
-  }
 
-  if (max_addr <= min_addr || max_addr >= UTOP) {
-    cprintf("Invalid memory mappings\n");
-    return -E_INVALID_EXE;
-  }
-
-  if (elf->e_entry >= max_addr || elf->e_entry < min_addr) {
-    cprintf("Program entry point %lu is outside proram data\n",
-            (unsigned long)elf->e_entry);
-    return -E_INVALID_EXE;
-  }
-
-  uintptr_t cr3 = rcr3();
-  lcr3(env->env_cr3);
-
-  for (size_t i = 0; i < elf->e_phnum; i++) {
-    if (ph[i].p_type == ELF_PROG_LOAD) {
-      void *src = binary + ph[i].p_offset;
-      void *dst = (void *)ph[i].p_va;
-
-      size_t memsz  = ph[i].p_memsz;
-      size_t filesz = MIN(ph[i].p_filesz, memsz);
-
-      memset(dst + filesz, 0, memsz - filesz);
-      memcpy(dst, src, filesz);
+    if (max_addr <= min_addr || max_addr >= UTOP) {
+        cprintf("Invalid memory mappings\n");
+        return -E_INVALID_EXE;
     }
-  }
 
-  lcr3(cr3);
+    if (elf->e_entry >= max_addr || elf->e_entry < min_addr) {
+        cprintf("Program entry point %lu is outside proram data\n",
+                (unsigned long)elf->e_entry);
+        return -E_INVALID_EXE;
+    }
 
-  /* Set progrma entry point */
-  env->env_tf.tf_rip = elf->e_entry;
-  cprintf("Program entry point %lx\n", (unsigned long)elf->e_entry);
+    uintptr_t cr3 = rcr3();
+    lcr3(env->env_cr3);
 
-  res = bind_functions(env, binary, size, min_addr, max_addr);
-  if (res < 0) {
-    cprintf("Failed to bind functions: %i\n", res);
-    return res;
-  }
+    for (size_t i = 0; i < elf->e_phnum; i++) {
+        if (ph[i].p_type == ELF_PROG_LOAD) {
+            void *src = binary + ph[i].p_offset;
+            void *dst = (void *)ph[i].p_va;
 
-  return 0;
+            size_t memsz  = ph[i].p_memsz;
+            size_t filesz = MIN(ph[i].p_filesz, memsz);
+
+            memset(dst + filesz, 0, memsz - filesz);
+            memcpy(dst, src, filesz);
+        }
+    }
+
+    lcr3(cr3);
+
+    /* Set progrma entry point */
+    env->env_tf.tf_rip = elf->e_entry;
+    cprintf("Program entry point %lx\n", (unsigned long)elf->e_entry);
+
+    res = bind_functions(env, binary, size, min_addr, max_addr);
+    if (res < 0) {
+        cprintf("Failed to bind functions: %i\n", res);
+        return res;
+    }
+
+    return 0;
 }
 
 /* Allocates a new env with env_alloc, loads the named elf
@@ -692,19 +690,19 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
  */
 void
 env_create(uint8_t *binary, size_t size, enum EnvType type) {
-  // LAB 3: Your code here:
+    // LAB 3: Your code here
 
-  if (!binary) panic("binary == NULL");
+    assert(binary && size);
 
-  struct Env *newenv;
-  if (env_alloc(&newenv, 0, type) < 0)
-    panic("Can't allocate new environment");
+    struct Env *newenv;
+    if (env_alloc(&newenv, 0, type) < 0)
+        panic("Can't allocate new environment");
 
 
-  if (load_icode(newenv, binary, size) < 0)
-    panic("Can't load ELF image");
+    if (load_icode(newenv, binary, size) < 0)
+        panic("Can't load ELF image");
 
-  newenv->binary = binary;
+    newenv->binary = binary;
 }
 
 
@@ -713,71 +711,68 @@ env_create(uint8_t *binary, size_t size, enum EnvType type) {
 void
 env_free(struct Env *env) {
 
-#ifndef CONFIG_KSPACE
-  /* If freeing the current environment, switch to kern_pgdir
-   * before freeing the page directory, just in case the page
-   * gets reused. */
-  if (env == curenv) lcr3(kern_cr3);
-#endif
-
-  /* Note the environment's demise. */
-  cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, env->env_id);
+    /* Note the environment's demise. */
+    cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, env->env_id);
 
 #ifndef CONFIG_KSPACE
-  /* Flush all mapped pages in the user portion of the address space */
-  static_assert(UTOP % HUGE_PAGE_SIZE == 0, "Misaligned UTOP");
+    /* If freeing the current environment, switch to kern_pgdir
+     * before freeing the page directory, just in case the page
+     * gets reused. */
+    if (env == curenv) lcr3(kern_cr3);
 
-  /* UTOP < PDPE[1] start, so all mapped memory should be in first PDPE */
-  pdpe_t *pdpe = KADDR(PTE_ADDR(env->env_pagetable[0]));
-  for (size_t pdpeno = 0; pdpeno <= PDP_INDEX(UTOP); pdpeno++) {
-    /*  only look at mapped page directory pointer index */
-    if (!(pdpe[pdpeno] & PTE_P))
-      continue;
+    /* Flush all mapped pages in the user portion of the address space */
+    static_assert(UTOP % HUGE_PAGE_SIZE == 0, "Misaligned UTOP");
 
-    pde_t *pgdir = KADDR(PTE_ADDR(pdpe[pdpeno]));
-    size_t pdeno_limit = pdpeno == PDP_INDEX(UTOP) ? PD_INDEX(UTOP) : PDP_ENTRY_COUNT;
+    /* UTOP < PDPE[1] start, so all mapped memory should be in first PDPE */
+    pdpe_t *pdp = KADDR(PTE_ADDR(env->env_pagetable[0]));
+    for (size_t pdp_i = 0; pdp_i <= PDP_INDEX(UTOP); pdp_i++) {
+        /*  Only look at mapped page directory pointer index */
+        if (!(pdp[pdp_i] & PTE_P)) continue;
 
-    for (size_t pdeno = 0; pdeno < pdeno_limit; pdeno++) {
+        pde_t *pd = KADDR(PTE_ADDR(pdp[pdp_i]));
+        size_t pd_limit = pdp_i == PDP_INDEX(UTOP) ? PD_INDEX(UTOP) : PDP_ENTRY_COUNT;
 
-      /* only look at mapped page tables */
-      if (!(pgdir[pdeno] & PTE_P))
-        continue;
+        for (size_t pd_i = 0; pd_i < pd_limit; pd_i++) {
+            /* Only look at mapped page tables */
+            if (!(pd[pd_i] & PTE_P)) continue;
 
-      /* find the pa and va of the page table */
-      physaddr_t pa = PTE_ADDR(pgdir[pdeno]);
-      pte_t *pt = (pte_t *)KADDR(pa);
+            /* Find the pa and va of the page table */
+            physaddr_t pa = PTE_ADDR(pd[pd_i]);
+            pte_t *pt = (pte_t *)KADDR(pa);
 
-      /* unmap all PTEs in this page table */
-      for (size_t pteno = 0; pteno < PT_ENTRY_COUNT; pteno++) {
-        if (pt[pteno] & PTE_P) page_remove(env->env_pagetable, MAKE_ADDR((uint64_t)0, pdpeno, pdeno, pteno, 0));
-      }
+            /* Unmap all PTEs in this page table */
+            for (size_t pt_i = 0; pt_i < PT_ENTRY_COUNT; pt_i++) {
+                if (pt[pt_i] & PTE_P) {
+                    page_remove(env->env_pagetable, MAKE_ADDR(0, pdp_i, pd_i, pt_i, 0));
+                }
+            }
 
-      /* free the page table itself */
-      pgdir[pdeno] = 0;
-      page_decref(pa2page(pa));
+            /* Free the page table itself */
+            pd[pd_i] = 0;
+            page_decref(pa2page(pa));
+        }
+
+        /* Free the page directory */
+        physaddr_t pa = PTE_ADDR(pdp[pdp_i]);
+        pdp[pdp_i] = 0;
+        page_decref(pa2page(pa));
     }
 
-    /* free the page directory */
-    size_t pa = PTE_ADDR(pdpe[pdpeno]);
-    pdpe[pdpeno] = 0;
+    /* Free the page directory pointer */
+    page_decref(pa2page(PTE_ADDR(env->env_pagetable[0])));
+
+    /* Free the page map level 4 (PML4) */
+    physaddr_t pa = env->env_cr3;
+    env->env_pagetable[0] = 0;
+    env->env_pagetable = 0;
+    env->env_cr3 = 0;
     page_decref(pa2page(pa));
-  }
-
-  /* free the page directory pointer */
-  page_decref(pa2page(PTE_ADDR(env->env_pagetable[0])));
-
-  /* free the page map level 4 (PML4) */
-  physaddr_t pa = env->env_cr3;
-  env->env_pagetable[0] = 0;
-  env->env_pagetable = 0;
-  env->env_cr3 = 0;
-  page_decref(pa2page(pa));
 #endif
 
-  /* return the environment to the free list */
-  env->env_status = ENV_FREE;
-  env->env_link = env_free_list;
-  env_free_list = env;
+    /* Return the environment to the free list */
+    env->env_status = ENV_FREE;
+    env->env_link = env_free_list;
+    env_free_list = env;
 }
 
 /* Frees environment env
@@ -787,33 +782,35 @@ env_free(struct Env *env) {
  */
 void
 env_destroy(struct Env *env) {
-  /* If env is currently running on other CPUs, we change its state to
-   * ENV_DYING. A zombie environment will be freed the next time
-   * it traps to the kernel. */
+    /* If env is currently running on other CPUs, we change its state to
+     * ENV_DYING. A zombie environment will be freed the next time
+     * it traps to the kernel. */
 
-  // LAB 3: Your code here:
+    // LAB 3: Your code here
 
-  env->env_status = ENV_DYING;
-  if (env == curenv) {
-    env_free(env);
-    sched_yield();
-  }
-  if (env->env_status != ENV_RUNNING) {
-    env_free(env);
-  }
+    if (env == curenv) {
+        env_free(env);
+        sched_yield();
+    } else if (env->env_status != ENV_RUNNING) {
+        env_free(env);
+    } else {
+        env->env_status = ENV_DYING;
+    }
 }
 
+#ifdef CONFIG_KSPACE
 void
 csys_exit(void) {
-  if (!curenv) panic("curenv = NULL");
-  env_destroy(curenv);
+    if (!curenv) panic("curenv = NULL");
+    env_destroy(curenv);
 }
 
 void
 csys_yield(struct Trapframe *tf) {
-  memcpy(&curenv->env_tf, tf, sizeof(struct Trapframe));
-  sched_yield();
+    memcpy(&curenv->env_tf, tf, sizeof(struct Trapframe));
+    sched_yield();
 }
+#endif
 
 /* Restores the register values in the Trapframe with the 'ret' instruction.
  * This exits the kernel and starts executing some environment's code.
@@ -823,67 +820,30 @@ csys_yield(struct Trapframe *tf) {
 
 _Noreturn void
 env_pop_tf(struct Trapframe *tf) {
-  //TODO Why is it here?
-  //static uintptr_t rip = 0;
-  //rip = tf->tf_rip;
+    asm volatile(
+        "movq %0, %%rsp\n"
+        "movq 0(%%rsp), %%r15\n"
+        "movq 8(%%rsp), %%r14\n"
+        "movq 16(%%rsp), %%r13\n"
+        "movq 24(%%rsp), %%r12\n"
+        "movq 32(%%rsp), %%r11\n"
+        "movq 40(%%rsp), %%r10\n"
+        "movq 48(%%rsp), %%r9\n"
+        "movq 56(%%rsp), %%r8\n"
+        "movq 64(%%rsp), %%rsi\n"
+        "movq 72(%%rsp), %%rdi\n"
+        "movq 80(%%rsp), %%rbp\n"
+        "movq 88(%%rsp), %%rdx\n"
+        "movq 96(%%rsp), %%rcx\n"
+        "movq 104(%%rsp), %%rbx\n"
+        "movq 112(%%rsp), %%rax\n"
+        "movw 120(%%rsp),%%es\n"
+        "movw 128(%%rsp),%%ds\n"
+        "addq $152,%%rsp\n" /* skip tf_trapno and tf_errcode */
+        "iretq" :: "g"(tf) : "memory");
 
-#ifdef CONFIG_KSPACE
-  asm volatile(
-      "movq %c[rbx](%[tf]), %%rbx \n\t"
-      "movq %c[rcx](%[tf]), %%rcx \n\t"
-      "movq %c[rdx](%[tf]), %%rdx \n\t"
-      "movq %c[rsi](%[tf]), %%rsi \n\t"
-      "movq %c[rdi](%[tf]), %%rdi \n\t"
-      "movq %c[rbp](%[tf]), %%rbp \n\t"
-      "movq %c[rd8](%[tf]), %%r8 \n\t"
-      "movq %c[rd9](%[tf]), %%r9 \n\t"
-      "movq %c[rd10](%[tf]), %%r10 \n\t"
-      "movq %c[rd11](%[tf]), %%r11 \n\t"
-      "movq %c[rd12](%[tf]), %%r12 \n\t"
-      "movq %c[rd13](%[tf]), %%r13 \n\t"
-      "movq %c[rd14](%[tf]), %%r14 \n\t"
-      "movq %c[rd15](%[tf]), %%r15 \n\t"
-      "pushq %c[ss](%[tf])\n\t"
-      "pushq %c[rsp](%[tf])\n\t"
-      "pushq %c[rflags](%[tf])\n\t"
-      "pushq %c[cs](%[tf])\n\t"
-      "pushq %c[rip](%[tf])\n\t"
-      "movq %c[rax](%[tf]), %%rax\n\t"
-      "iretq\n\t"
-      :
-      : [ tf ] "a"(tf),
-        [ rip ] "i"(offsetof(struct Trapframe, tf_rip)),
-        [ rax ] "i"(offsetof(struct Trapframe, tf_regs.reg_rax)),
-        [ rbx ] "i"(offsetof(struct Trapframe, tf_regs.reg_rbx)),
-        [ rcx ] "i"(offsetof(struct Trapframe, tf_regs.reg_rcx)),
-        [ rdx ] "i"(offsetof(struct Trapframe, tf_regs.reg_rdx)),
-        [ rsi ] "i"(offsetof(struct Trapframe, tf_regs.reg_rsi)),
-        [ rdi ] "i"(offsetof(struct Trapframe, tf_regs.reg_rdi)),
-        [ rbp ] "i"(offsetof(struct Trapframe, tf_regs.reg_rbp)),
-        [ rd8 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r8)),
-        [ rd9 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r9)),
-        [ rd10 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r10)),
-        [ rd11 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r11)),
-        [ rd12 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r12)),
-        [ rd13 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r13)),
-        [ rd14 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r14)),
-        [ rd15 ] "i"(offsetof(struct Trapframe, tf_regs.reg_r15)),
-        [ rflags ] "i"(offsetof(struct Trapframe, tf_rflags)),
-        [ cs ] "i"(offsetof(struct Trapframe, tf_cs)),
-        [ ss ] "i"(offsetof(struct Trapframe, tf_ss)),
-        [ rsp ] "i"(offsetof(struct Trapframe, tf_rsp))
-      : "cc", "memory", "ebx", "ecx", "edx", "esi", "edi");
-#else
-  asm volatile("movq %0,%%rsp\n" POPA
-               "movw (%%rsp),%%es\n"
-               "movw 8(%%rsp),%%ds\n"
-               "addq $16,%%rsp\n"
-               "addq $16,%%rsp\n" /* skip tf_trapno and tf_errcode */
-               "iretq"
-                   :: "g"(tf) : "memory");
-#endif
-  /* Mostly to placate the compiler */
-  panic("Reached unrecheble");
+    /* Mostly to placate the compiler */
+    panic("Reached unrecheble\n");
 }
 
 /* Context switch from curenv to env.
@@ -910,28 +870,30 @@ env_pop_tf(struct Trapframe *tf) {
  */
 void
 env_run(struct Env *env) {
-  if (debug && env) cprintf("envrun %s: %d\n", (const char *[]){
-      "FREE", "DYING", "RUNNABLE", "RUNNING", "NOT_RUNNABLE" }[env->env_status], ENVX(env->env_id));
-
-  // LAB 3: Your code here:
-
-  if (curenv) {
-    if (curenv->env_status == ENV_DYING) {
-      struct Env *old = curenv;
-      env_free(curenv);
-      if (old == env) sched_yield();
-    } else if (curenv->env_status == ENV_RUNNING) {
-      curenv->env_status = ENV_RUNNABLE;
+    if (debug && env) {
+        const char *state[] = { "FREE", "DYING", "RUNNABLE", "RUNNING", "NOT_RUNNABLE" };
+        cprintf("envrun %s: %d\n", state[env->env_status], ENVX(env->env_id));
     }
-  }
 
-  curenv = env;
-  curenv->env_status = ENV_RUNNING;
-  curenv->env_runs++;
+    // LAB 3: Your code here
 
-  // LAB 8: Your code here:
+    if (curenv) {
+        if (curenv->env_status == ENV_DYING) {
+            struct Env *old = curenv;
+            env_free(curenv);
+            if (old == env) sched_yield();
+        } else if (curenv->env_status == ENV_RUNNING) {
+            curenv->env_status = ENV_RUNNABLE;
+        }
+    }
 
-  lcr3(env->env_cr3);
+    curenv = env;
+    curenv->env_status = ENV_RUNNING;
+    curenv->env_runs++;
 
-  env_pop_tf(&curenv->env_tf);
+    // LAB 8: Your code here
+
+    lcr3(env->env_cr3);
+
+    env_pop_tf(&curenv->env_tf);
 }

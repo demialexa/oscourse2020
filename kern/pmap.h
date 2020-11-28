@@ -13,7 +13,7 @@ struct Env;
 extern char bootstacktop[], bootstack[];
 extern struct PageInfo *pages;
 extern size_t npages;
-extern pde_t *kern_pml4e;
+extern pde_t *kern_pml4;
 
 /* This macro takes a kernel virtual address -- an address that points above
  * KERNBASE, where the machine's maximum 512MB of physical memory is mapped --
@@ -23,9 +23,9 @@ extern pde_t *kern_pml4e;
 
 static inline physaddr_t
 _paddr(const char *file, int line, void *kva) {
-  if ((uint64_t)kva < KERNBASE)
-    _panic(file, line, "PADDR called with invalid kva %p", kva);
-  return (physaddr_t)kva - KERNBASE;
+    if ((uint64_t)kva < KERNBASE)
+        _panic(file, line, "PADDR called with invalid kva %p", kva);
+    return (physaddr_t)kva - KERNBASE;
 }
 
 /* This macro takes a physical address and returns the corresponding kernel
@@ -36,20 +36,20 @@ _paddr(const char *file, int line, void *kva) {
 
 static inline void *
 _kaddr(const char *file, int line, physaddr_t pa) {
-  if (PAGE_NUMBER(pa) >= npages)
-    _panic(file, line, "KADDR called with invalid pa %p", (void *)pa);
-  return (void *)(pa + KERNBASE);
+    if (PAGE_NUMBER(pa) >= npages)
+        _panic(file, line, "KADDR called with invalid pa %p", (void *)pa);
+    return (void *)(pa + KERNBASE);
 }
 
-#define X86MASK 0xFFFFFFFF
 /* This macro takes a kernel virtual address and applies 32-bit mask to it.
  * This is used for mapping required regions in kernel PML table so that
  * required addresses are accessible in 32-bit uefi. */
+#define X86MASK 0xFFFFFFFF
 #define X86ADDR(kva) ((kva)&X86MASK)
 
 enum {
   /* For page_alloc, zero the returned physical page. */
-  ALLOC_ZERO = 1 << 0,
+    ALLOC_ZERO = 1 << 0,
 };
 
 void mem_init(void);
@@ -68,28 +68,28 @@ int page_is_allocated(const struct PageInfo *pp);
 void tlb_invalidate(pml4e_t *pml4e, void *va);
 void *mmio_map_region(physaddr_t pa, size_t size);
 void *mmio_remap_last_region(physaddr_t pa, void *addr, size_t oldsz, size_t newsz);
-pte_t *pml4e_walk(pml4e_t *pml4e, const void *va, bool alloc);
+pte_t *walk_pagetable(pml4e_t *pml4e, const void *va, bool alloc);
 
 int user_mem_check(struct Env *env, const void *va, size_t len, int perm);
 void user_mem_assert(struct Env *env, const void *va, size_t len, int perm);
 
 static inline physaddr_t
 page2pa(struct PageInfo *pp) {
-  return (pp - pages) << PAGE_SHIFT;
+    return (pp - pages) << PAGE_SHIFT;
 }
 
 static inline struct PageInfo *
 pa2page(physaddr_t pa) {
-  if (PAGE_NUMBER(pa) >= npages) {
-    cprintf("accessing %lx\n", (unsigned long)pa);
-    panic("pa2page called with invalid pa");
-  }
-  return &pages[PAGE_NUMBER(pa)];
+    if (PAGE_NUMBER(pa) >= npages) {
+        cprintf("accessing %lx\n", (unsigned long)pa);
+        panic("pa2page called with invalid pa");
+    }
+    return &pages[PAGE_NUMBER(pa)];
 }
 
 static inline void *
 page2kva(struct PageInfo *pp) {
-  return KADDR(page2pa(pp));
+    return KADDR(page2pa(pp));
 }
 
 #endif /* !JOS_KERN_PMAP_H */

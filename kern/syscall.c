@@ -203,7 +203,7 @@ do_map_page(struct Env *srcenv, void *srcva,
     if (PAGE_OFFSET(srcva) || srcva >= (void *)UTOP) return -E_INVAL;
     if (PAGE_OFFSET(dstva) || dstva >= (void *)UTOP) return -E_INVAL;
 
-    pte_t *ent = pml4e_walk(srcenv->env_pagetable, srcva, 0);
+    pte_t *ent = walk_pagetable(srcenv->env_pagetable, srcva, 0);
     if (!ent) return -E_INVAL;
 
     struct PageInfo *pi = pa2page(PTE_ADDR(*ent));
@@ -276,12 +276,11 @@ sys_page_unmap(envid_t envid, void *va) {
 
     // LAB 9: Your code here
 
+    if (PAGE_OFFSET(va) || va >= (void *)UTOP) return -E_INVAL;
+
     struct Env *env;
     int res = envid2env(envid, &env, 1);
     if (res < 0) return res;
-
-    if (va >= (void *)UTOP) return -E_INVAL;
-    if (PAGE_OFFSET(va)) return -E_INVAL;
 
     page_remove(env->env_pagetable, va);
 
@@ -311,7 +310,8 @@ sys_page_unmap(envid_t envid, void *va) {
  * then no page mapping is transferred, but no error occurs.
  * The ipc only happens when no errors occur.
  *
- * Returns 0 on success, < 0 on error.
+../
+* Returns 0 on success, < 0 on error.
  * Errors are:
  *  -E_BAD_ENV if environment envid doesn't currently exist.
  *      (No need to check permissions.)

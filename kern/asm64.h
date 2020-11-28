@@ -32,20 +32,20 @@
 /* Helper macros for 64-bit mode switching */
 
 /* Long jump to 64-bit space from 32-bit compatibility mode */
-#define ENTER_64BIT_MODE()      \
-  push $GD_KT;                  \
-  call 1f;                      \
-  1: addl $(2f - 1b), (% esp);  \
-  lret;                         \
-  2:.code64
+#define ENTER_64BIT_MODE()        \
+    push $GD_KT;                  \
+    call 1f;                      \
+    1: addl $(2f - 1b), (% esp);  \
+    lret;                         \
+    2:.code64
 
 /* Long jump to 32-bit compatibility mode from 64-bit space.
  * Effected by long return similar to ENTER_64BIT_MODE */
-#define ENTER_COMPAT_MODE()     \
-  call 3f;                      \
-  3: addq $(4f - 3b), (% rsp);  \
-  movl $GD_KT32, 4(% rsp);      \
-  lret;                         \
-  4:.code32
+#define ENTER_COMPAT_MODE()       \
+    call 3f;                      \
+    3: addq $(4f - 3b), (% rsp);  \
+    movl $GD_KT32, 4(% rsp);      \
+    lret;                         \
+    4:.code32
 
 #endif // ASM64_H
