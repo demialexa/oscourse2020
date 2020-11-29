@@ -185,7 +185,7 @@ sys_page_alloc(envid_t envid, void *va, int perm) {
     if (PAGE_OFFSET(va) || va >= (void *)UTOP) return -E_INVAL;
     if ((perm & ~(PTE_AVAIL | PTE_W)) != (PTE_U | PTE_P)) return -E_INVAL;
 
-    struct PageInfo *pi = page_alloc(0);
+    struct PageInfo *pi = page_alloc(ALLOC_ZERO);
     if (!pi) return -E_NO_MEM;
 
     res = page_insert(env->env_pagetable, pi, va, perm);
