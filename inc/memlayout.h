@@ -158,7 +158,19 @@
 #define MAXOPEN 512
 #define FILEVA  0xD0000000
 
-#ifdef SANITIZE_USER_SHADOW_OFF
+
+#ifdef SAN_ENABLE_KASAN
+#define SANITIZE_SHADOW_BASE 0x8080000000
+/* SANITIZE_SHADOW_SIZE of 32 MB allows 256 MB of addressible memory (due to byte granularity). */
+#define SANITIZE_SHADOW_SIZE 0x8000000
+#define SANITIZE_SHADOW_OFF (SANITIZE_SHADOW_BASE - (KERNBASE >> 3))
+#endif
+
+#ifdef SAN_ENABLE_UASAN
+#define SANITIZE_USER_SHADOW_BASE 0x21000000
+#define SANITIZE_USER_SHADOW_SIZE 0x3000000
+#define SANITIZE_USER_SHADOW_OFF SANITIZE_USER_SHADOW_BASE
+
 /* User stack and some other tables are located at higher addresses,
  * so we need to map a separate shadow for it. */
 #define SANITIZE_USER_EXTRA_SHADOW_BASE (((UENVS >> 3) + SANITIZE_USER_SHADOW_OFF) & ~(PAGE_SIZE - 1))
@@ -173,7 +185,7 @@
 
 /* UVPT is located at another specific address space */
 #define SANITIZE_USER_VPT_SHADOW_BASE ((UVPT >> 3) + SANITIZE_USER_SHADOW_OFF)
-#define SANITIZE_USER_VPT_SHADOW_SIZE ((((UVPT_SIZE + UVPD_SIZE + UVPDP_SIZE + UVPML4_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
+#define SANITIZE_USER_VPT_SHADOW_SIZE ((((UVPT - UVPML4 + PAGE_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
 #endif
 
 /* Where user programs generally begin */

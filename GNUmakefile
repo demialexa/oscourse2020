@@ -159,14 +159,14 @@ KERN_SAN_LDFLAGS :=
 
 ifdef KASAN
 
-CFLAGS += -DSAN_ENABLE_KASAN=1
+CFLAGS += -DSAN_ENABLE_KASAN
 
-# The definitions assume kernel base address at 0x8041600000, see kern/kernel.ld for details.
-# SANITIZE_SHADOW_OFF is an offset from shadow base (SHADOW_BASE - (KERNBASE >> 3)).
-# SANITIZE_SHADOW_SIZE of 32 MB allows 256 MB of addressible memory (due to byte granularity).
-KERN_SAN_CFLAGS := -fsanitize=address -fsanitize-blacklist=llvm/blacklist.txt \
-	-DSANITIZE_SHADOW_OFF=0x7077d40000 -DSANITIZE_SHADOW_BASE=0x8080000000 \
-	-DSANITIZE_SHADOW_SIZE=0x8000000 -mllvm -asan-mapping-offset=0x7077d40000
+# We need to find KERN_SHADOW_BASE and KERNBASE separately
+# since SANITIZE_SHADOW_OFF is defined in terms of them and we need evaluated equvaluent
+KERNBASE != sed -n 's/\#define KERNBASE \(.*\)/\1/p' inc/memlayout.h
+KERN_SHADOW_BASE != sed -n 's/\#define SANITIZE_SHADOW_BASE \(.*\)/\1/p' inc/memlayout.h
+KERN_SAN_CFLAGS := -fsanitize=address -fsanitize-blacklist=llvm/blacklist.txt -mllvm
+KERN_SAN_CFLAGS += $(shell printf "\-asan-mapping-offset=0x%x" $$(($(KERN_SHADOW_BASE) - $(KERNBASE)/8)))
 
 KERN_SAN_LDFLAGS := --wrap memcpy  \
 	--wrap memset  \
@@ -188,7 +188,7 @@ endif
 
 ifdef KUBSAN
 
-CFLAGS += -DSAN_ENABLE_KUBSAN=1
+CFLAGS += -DSAN_ENABLE_KUBSAN
 
 KERN_SAN_CFLAGS += -fsanitize=undefined \
 	-fsanitize=implicit-integer-truncation \
@@ -203,17 +203,15 @@ USER_SAN_LDFLAGS :=
 
 ifdef UASAN
 
-CFLAGS += -DSAN_ENABLE_UASAN=1
+CFLAGS += -DSAN_ENABLE_UASAN
 
 # The definitions assume user base address at 0x0, see user/user.ld for details.
 # SANITIZE_SHADOW_SIZE 32 MB allows 256 MB of addressible memory (due to byte granularity).
 # Extra page (+0x1000 to offset) avoids an optimisation via 'or' that assumes that unsigned wrap-around is impossible.
-USER_SAN_CFLAGS := -fsanitize=address -fsanitize-blacklist=llvm/ublacklist.txt \
-	-DSANITIZE_USER_SHADOW_OFF=0x21000000 -DSANITIZE_USER_SHADOW_BASE=0x21000000 \
-	-DSANITIZE_USER_SHADOW_SIZE=0x3000000 -mllvm -asan-mapping-offset=0x21000000
-# To let the kernel map the first environment we additionally expose the variables to it.
-KERN_SAN_CFLAGS += -DSANITIZE_USER_SHADOW_OFF=0x21000000 \
-	-DSANITIZE_USER_SHADOW_BASE=0x21000000 -DSANITIZE_USER_SHADOW_SIZE=0x3000000
+
+USER_SAN_CFLAGS := -fsanitize=address -fsanitize-blacklist=llvm/ublacklist.txt -mllvm
+USER_SAN_CFLAGS += $(shell sed -n 's/\#define SANITIZE_USER_SHADOW_BASE \(.*\)/ -asan-mapping-offset=\1 /p' inc/memlayout.h)
+
 USER_SAN_LDFLAGS := --wrap memcpy  \
 	--wrap memset  \
 	--wrap memmove \
@@ -234,7 +232,7 @@ endif
 
 ifdef UUBSAN
 
-CFLAGS += -DSAN_ENABLE_UUBSAN=1
+CFLAGS += -DSAN_ENABLE_UUBSAN
 
 USER_SAN_CFLAGS += -fsanitize=undefined \
 	-fsanitize=implicit-integer-truncation \

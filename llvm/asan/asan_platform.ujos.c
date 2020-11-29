@@ -16,6 +16,7 @@
 #include "asan.h"
 #include "asan_internal.h"
 #include "asan_memintrinsics.h"
+#include "inc/memlayout.h"
 
 #if !defined(SANITIZE_USER_SHADOW_BASE) || !defined(SANITIZE_USER_SHADOW_SIZE) || !defined(SANITIZE_USER_SHADOW_OFF)
 #error "You are to define SANITIZE_USER_SHADOW_BASE and SANITIZE_USER_SHADOW_SIZE for shadow memory support!"
