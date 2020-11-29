@@ -125,16 +125,12 @@
  * They are global pages mapped in at env allocation time.
  */
 
-#define UVPML4_SIZE PAGE_SIZE
-#define UVPDP_SIZE  (2*PAGE_SIZE)
-#define UVPD_SIZE   (PD_ENTRY_COUNT*UVPDP_SIZE)
-#define UVPT_SIZE   (PT_ENTRY_COUNT*UVPD_SIZE)
-
 /* User read-only virtual page table (see 'uvpt' below) */
-#define UVPT   0x10000000000
-#define UVPD   (UVPT + UVPT_SIZE)
-#define UVPDP  (UVPD + UVPD_SIZE)
-#define UVPML4 (UVPDP + UVPDP_SIZE)
+#define UVPT_INDEX 2ULL
+#define UVPT (UVPT_INDEX << PML4_SHIFT)
+#define UVPD (UVPT + (UVPT_INDEX << PDP_SHIFT))
+#define UVPDP (UVPD + (UVPT_INDEX << PD_SHIFT))
+#define UVPML4 (UVPDP + (UVPT_INDEX << PT_SHIFT))
 
 /* Read-only copies of the Page structures (sizeof == 400 * HUGE_PAGE_SIZE so that all
  * struct PageInfo of up to 512GiB pages can fit here). */

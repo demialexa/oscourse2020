@@ -47,24 +47,24 @@
 #define PML4_ENTRY_COUNT 512 /* Page PML4 entries per PML4 */
 #define PML4_ENTRY_SHIFT 9
 
-#define PT_SHIFT   PAGE_SHIFT                    /* offset of PT index in a linear address */
-#define PD_SHIFT   (PT_SHIFT + PT_ENTRY_SHIFT)   /* offset of PD index in a linear address */
-#define PDP_SHIFT  (PD_SHIFT + PD_ENTRY_SHIFT)   /* offset of PDPX index in a linear address */
-#define PML4_SHIFT (PDP_SHIFT + PML4_ENTRY_SHIFT)/* offset of PML4 index in a linear address */
+#define PT_SHIFT   PAGE_SHIFT                     /* offset of PT index in a linear address */
+#define PD_SHIFT   (PT_SHIFT + PT_ENTRY_SHIFT)    /* offset of PD index in a linear address */
+#define PDP_SHIFT  (PD_SHIFT + PD_ENTRY_SHIFT)    /* offset of PDPX index in a linear address */
+#define PML4_SHIFT (PDP_SHIFT + PML4_ENTRY_SHIFT) /* offset of PML4 index in a linear address */
 
 #define HUGE_PAGE_SHIFT (PAGE_SHIFT + PT_ENTRY_SHIFT)
 #define HUGE_PAGE_SIZE  (1LL << HUGE_PAGE_SHIFT) /* Bytes mapped by a page directory entry/huge page */
 
 
 /* Linear page number for 4K pages */
-#define PAGE_NUMBER(pa)   (((uintptr_t)(pa)) >> PAGE_SHIFT)
+#define PAGE_NUMBER(pa) (((uintptr_t)(pa)) >> PAGE_SHIFT)
 
 /* Offset in page */
 #define PAGE_OFFSET(la) (((uintptr_t)(la)) & (PAGE_SIZE - 1))
 /* Page table index */
-#define PT_INDEX(la)  ((((uintptr_t)(la)) >> PT_SHIFT) & (PT_ENTRY_COUNT - 1))
+#define PT_INDEX(la) ((((uintptr_t)(la)) >> PT_SHIFT) & (PT_ENTRY_COUNT - 1))
 /* Page directory index */
-#define PD_INDEX(la)    ((((uintptr_t)(la)) >> PD_SHIFT) & (PD_ENTRY_COUNT - 1))
+#define PD_INDEX(la) ((((uintptr_t)(la)) >> PD_SHIFT) & (PD_ENTRY_COUNT - 1))
 /* Page directory pointer index */
 #define PDP_INDEX(la) ((((uintptr_t)(la)) >> PDP_SHIFT) & (PDP_ENTRY_COUNT - 1))
 /* Page map level 4 index */
@@ -73,10 +73,10 @@
 /* Construct linear address from indexes and offset */
 #define MAKE_ADDR(m, p, d, t, o) ((void*)((uintptr_t)(m) << PML4_SHIFT | (uintptr_t)(p) << PDP_SHIFT | (uintptr_t)(d) << PD_SHIFT | (uintptr_t)(t) << PT_SHIFT | (o)))
 
-#define VPT(la)    PAGE_NUMBER(la)                 /* used to index into vpt[] */
-#define VPD(la)    (((uintptr_t)(la)) >> PD_SHIFT) /* used to index into vpd[] */
-#define VPDP(la)  (((uintptr_t)(la)) >> PDP_SHIFT) /* used to index into vpdp[] */
-#define VPML4(la) (((uintptr_t)(la)) >> PML4_SHIFT)/* used to index into vpml4[] */
+#define VPT(la)   PAGE_NUMBER(la)                   /* used to index into vpt[] */
+#define VPD(la)   (((uintptr_t)(la)) >> PD_SHIFT)   /* used to index into vpd[] */
+#define VPDP(la)  (((uintptr_t)(la)) >> PDP_SHIFT)  /* used to index into vpdp[] */
+#define VPML4(la) (((uintptr_t)(la)) >> PML4_SHIFT) /* used to index into vpml4[] */
 
 
 /* Page table/directory entry flags */
@@ -166,23 +166,23 @@
 #ifdef __ASSEMBLER__
 
 /* Macros to build GDT entries in assembly. */
-#define SEG_NULL   \
-    .word 0, 0;    \
+#define SEG_NULL \
+    .word 0, 0;  \
     .byte 0, 0, 0, 0
 #define SEG(type, base, lim)                        \
     .word(((lim) >> 12) & 0xFFFF), ((base)&0xFFFF); \
     .byte(((base) >> 16) & 0xFF), (0x90 | (type)),  \
-      (0xC0 | (((lim) >> 28) & 0xF)), (((base) >> 24) & 0xFF)
+            (0xC0 | (((lim) >> 28) & 0xF)), (((base) >> 24) & 0xFF)
 
 #define SEG64(type, base, lim)                      \
     .word(((lim) >> 12) & 0xFFFF), ((base)&0xFFFF); \
     .byte(((base) >> 16) & 0xFF), (0x90 | (type)),  \
-      (0xA0 | (((lim) >> 28) & 0xF)), (((base) >> 24) & 0xFF)
+            (0xA0 | (((lim) >> 28) & 0xF)), (((base) >> 24) & 0xFF)
 
 #define SEG64USER(type, base, lim)                  \
     .word(((lim) >> 12) & 0xFFFF), ((base)&0xFFFF); \
     .byte(((base) >> 16) & 0xFF), (0xf0 | (type)),  \
-      (0xA0 | (((lim) >> 28) & 0xF)), (((base) >> 24) & 0xFF)
+            (0xA0 | (((lim) >> 28) & 0xF)), (((base) >> 24) & 0xFF)
 
 #else // not __ASSEMBLER__
 
@@ -225,47 +225,58 @@ struct Segdesc64 {
     unsigned sd_res2 : 16;
 } __attribute__((packed));
 
-#define SEG64_TSS(type, base, lim, dpl) (struct Segdesc64) {    \
-        .sd_lim_15_0   = (uint64_t)(lim) & 0xFFFF,              \
-        .sd_base_15_0  = (uint64_t)(base) & 0xFFFF,             \
+#define SEG64_TSS(type, base, lim, dpl)                         \
+    (struct Segdesc64) {                                        \
+        .sd_lim_15_0 = (uint64_t)(lim)&0xFFFF,                  \
+        .sd_base_15_0 = (uint64_t)(base)&0xFFFF,                \
         .sd_base_23_16 = ((uint64_t)(base) >> 16) & 0xFF,       \
-        .sd_type       = type,                                  \
-        .sd_s          = 0,                                     \
-        .sd_dpl        = 0,                                     \
-        .sd_p          = 1,                                     \
-        .sd_lim_19_16  = ((uint64_t)(lim) >> 16) & 0xF,         \
-        .sd_avl        = 0,                                     \
-        .sd_rsv1       = 0,                                     \
-        .sd_g          = 0,                                     \
+        .sd_type = type,                                        \
+        .sd_s = 0,                                              \
+        .sd_dpl = 0,                                            \
+        .sd_p = 1,                                              \
+        .sd_lim_19_16 = ((uint64_t)(lim) >> 16) & 0xF,          \
+        .sd_avl = 0,                                            \
+        .sd_rsv1 = 0,                                           \
+        .sd_g = 0,                                              \
         .sd_base_31_24 = ((uint64_t)(base) >> 24) & 0xFF,       \
         .sd_base_63_32 = ((uint64_t)(base) >> 32) & 0xFFFFFFFF, \
-        .sd_res1       = 0,                                     \
-        .sd_clear      = 0,                                     \
-        .sd_res2       = 0,                                     \
+        .sd_res1 = 0,                                           \
+        .sd_clear = 0,                                          \
+        .sd_res2 = 0,                                           \
     }
 
 /* Null segment */
-#define SEG_NULL (struct Segdesc32) { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+#define SEG_NULL                              \
+    (struct Segdesc32) {                      \
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 \
+    }
 
 /* Segment that is loadable but faults when used */
-#define SEG_FAULT (struct Segdesc32) { 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }
+#define SEG_FAULT                             \
+    (struct Segdesc32) {                      \
+        0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 \
+    }
 
 /* Normal segment */
-#define SEG64(type, base, lim, dpl) (struct Segdesc32) {                  \
-        ((lim) >> 12) & 0xFFFF, (base) & 0xFFFF, ((base) >> 16) & 0xFF, \
-        type, 1, dpl, 1, (unsigned)(lim) >> 28, 0, 1, 0, 1,             \
-        (unsigned)(base) >> 24                                          \
-    }
-#define SEG32(type, base, lim, dpl) (struct Segdesc32) {                  \
-        ((lim) >> 12) & 0xFFFF, (base) & 0xFFFF, ((base) >> 16) & 0xFF, \
-        type, 1, dpl, 1, (unsigned)(lim) >> 28, 0, 0, 1, 1,             \
-        (unsigned)(base) >> 24                                          \
+#define SEG64(type, base, lim, dpl)                                   \
+    (struct Segdesc32) {                                              \
+        ((lim) >> 12) & 0xFFFF, (base)&0xFFFF, ((base) >> 16) & 0xFF, \
+                type, 1, dpl, 1, (unsigned)(lim) >> 28, 0, 1, 0, 1,   \
+                (unsigned)(base) >> 24                                \
     }
 
-#define SEG16(type, base, lim, dpl) (struct Segdesc32) {                  \
-        (lim) & 0xFFFF, (base) & 0xFFFF, ((base) >> 16) & 0xFF,         \
-        type, 1, dpl, 1, (unsigned)(lim) >> 16, 0, 0, 1, 0,             \
-        (unsigned)(base) >> 24                                          \
+#define SEG32(type, base, lim, dpl)                                   \
+    (struct Segdesc32) {                                              \
+        ((lim) >> 12) & 0xFFFF, (base)&0xFFFF, ((base) >> 16) & 0xFF, \
+                type, 1, dpl, 1, (unsigned)(lim) >> 28, 0, 0, 1, 1,   \
+                (unsigned)(base) >> 24                                \
+    }
+
+#define SEG16(type, base, lim, dpl)                                 \
+    (struct Segdesc32) {                                            \
+        (lim) & 0xFFFF, (base)&0xFFFF, ((base) >> 16) & 0xFF,       \
+                type, 1, dpl, 1, (unsigned)(lim) >> 16, 0, 0, 1, 0, \
+                (unsigned)(base) >> 24                              \
     }
 
 
@@ -308,8 +319,8 @@ struct Taskstate {
     uintptr_t ts_rsp1;
     uintptr_t ts_rsp2;
     uint64_t ts_res2;
-    uint64_t ts_ist1;  /* fields used in for interrupt stack switching */
-    uint64_t ts_ist2;  /* (not used in JOS) */
+    uint64_t ts_ist1; /* fields used in for interrupt stack switching */
+    uint64_t ts_ist2; /* (not used in JOS) */
     uint64_t ts_ist3;
     uint64_t ts_ist4;
     uint64_t ts_ist5;
@@ -349,35 +360,36 @@ struct Gatedesc {
  * - dpl: Descriptor Privilege Level -
  *    the privilege level required for software to invoke
  *    this interrupt/trap gate explicitly using an int instruction. */
-#define SETGATE(gate, istrap, sel, off, dpl) {                  \
-    (gate).gd_off_15_0  = (uint64_t)(off)&0xFFFF;               \
-    (gate).gd_ss        = (sel);                                \
-    (gate).gd_ist       = 0;                                    \
-    (gate).gd_rsv1      = 0;                                    \
-    (gate).gd_type      = (istrap) ? STS_TG64 : STS_IG64;       \
-    (gate).gd_s         = 0;                                    \
-    (gate).gd_dpl       = (dpl);                                \
-    (gate).gd_p         = 1;                                    \
-    (gate).gd_off_31_16 = ((uint64_t)(off) >> 16) & 0xFFFF;     \
-    (gate).gd_off_32_63 = ((uint64_t)(off) >> 32) & 0xFFFFFFFF; \
-    (gate).gd_rsv2      = 0;                                    \
-  }
+#define GATE(istrap, sel, off, dpl)                           \
+    (struct Gatedesc) {                                       \
+        .gd_off_15_0 = (uint64_t)(off)&0xFFFF,                \
+        .gd_ss = (sel),                                       \
+        .gd_ist = 0,                                          \
+        .gd_rsv1 = 0,                                         \
+        .gd_type = (istrap) ? STS_TG64 : STS_IG64,            \
+        .gd_s = 0,                                            \
+        .gd_dpl = (dpl),                                      \
+        .gd_p = 1,                                            \
+        .gd_off_31_16 = ((uint64_t)(off) >> 16) & 0xFFFF,     \
+        .gd_off_32_63 = ((uint64_t)(off) >> 32) & 0xFFFFFFFF, \
+        .gd_rsv2 = 0,                                         \
+    }
 
 /* Set up a call gate descriptor */
-#define SETCALLGATE(gate, ss, off, dpl)                         \
-  {                                                             \
-    (gate).gd_off_15_0  = (uint32_t)(off)&0xFFFF;               \
-    (gate).gd_ss        = (ss);                                 \
-    (gate).gd_ist       = 0;                                    \
-    (gate).gd_rsv1      = 0;                                    \
-    (gate).gd_type      = STS_CG64;                             \
-    (gate).gd_s         = 0;                                    \
-    (gate).gd_dpl       = (dpl);                                \
-    (gate).gd_p         = 1;                                    \
-    (gate).gd_off_31_16 = ((uint32_t)(off) >> 16) & 0xFFFF;     \
-    (gate).gd_off_32_63 = ((uint64_t)(off) >> 32) & 0xFFFFFFFF; \
-    (gate).gd_rsv2      = 0;                                    \
-  }
+#define CALLGATE(ss, off, dpl)                                      \
+    (struct Gatedesc) {                                             \
+        (gate).gd_off_15_0 = (uint32_t)(off)&0xFFFF,                \
+        (gate).gd_ss = (ss),                                        \
+        (gate).gd_ist = 0,                                          \
+        (gate).gd_rsv1 = 0,                                         \
+        (gate).gd_type = STS_CG64,                                  \
+        (gate).gd_s = 0,                                            \
+        (gate).gd_dpl = (dpl),                                      \
+        (gate).gd_p = 1,                                            \
+        (gate).gd_off_31_16 = ((uint32_t)(off) >> 16) & 0xFFFF,     \
+        (gate).gd_off_32_63 = ((uint64_t)(off) >> 32) & 0xFFFFFFFF, \
+        (gate).gd_rsv2 = 0,                                         \
+    }
 
 /* Pseudo-descriptors used for LGDT, LLDT and LIDT instructions */
 struct Pseudodesc {
