@@ -131,10 +131,10 @@
 
 /* User read-only virtual page table (see 'uvpt' below) */
 #define UVPT_INDEX 2ULL
-#define UVPT (UVPT_INDEX << PML4_SHIFT)
-#define UVPD (UVPT + (UVPT_INDEX << PDP_SHIFT))
-#define UVPDP (UVPD + (UVPT_INDEX << PD_SHIFT))
-#define UVPML4 (UVPDP + (UVPT_INDEX << PT_SHIFT))
+#define UVPT       (UVPT_INDEX << PML4_SHIFT)
+#define UVPD       (UVPT + (UVPT_INDEX << PDP_SHIFT))
+#define UVPDP      (UVPD + (UVPT_INDEX << PD_SHIFT))
+#define UVPML4     (UVPDP + (UVPT_INDEX << PT_SHIFT))
 
 /* Read-only copies of the Page structures (sizeof == 400 * HUGE_PAGE_SIZE so that all
  * struct PageInfo of up to 512GiB pages can fit here). */
@@ -169,14 +169,14 @@
 #define SANITIZE_SHADOW_BASE 0x8080000000
 /* SANITIZE_SHADOW_SIZE of 32 MB allows 256 MB of addressible memory (due to byte granularity). */
 #define SANITIZE_SHADOW_SIZE 0x8000000
-#define SANITIZE_SHADOW_OFF (SANITIZE_SHADOW_BASE - ((KERNBASE + KERN_START_OFFSET) >> 3))
+#define SANITIZE_SHADOW_OFF  (SANITIZE_SHADOW_BASE - ((KERNBASE + KERN_START_OFFSET) >> 3))
 #endif
 
 #ifdef SAN_ENABLE_UASAN
 /* (this *should* be defined as a literal number) */
 #define SANITIZE_USER_SHADOW_BASE 0x21000000
 #define SANITIZE_USER_SHADOW_SIZE 0x3000000
-#define SANITIZE_USER_SHADOW_OFF SANITIZE_USER_SHADOW_BASE
+#define SANITIZE_USER_SHADOW_OFF  SANITIZE_USER_SHADOW_BASE
 
 /* User stack and some other tables are located at higher addresses,
  * so we need to map a separate shadow for it. */
@@ -228,9 +228,9 @@ typedef uint64_t pte_t;
  * will always be available at virtual address (UVPT + (UVPT >> PGSHIFT)), to
  * which uvpd is set in entry.S.
  */
-extern volatile pte_t uvpt[];      /* VA of "virtual page table" */
-extern volatile pde_t uvpd[];      /* VA of current page directory */
-extern volatile pdpe_t uvpdp[];    /* VA of current page directory pointer */
+extern volatile pte_t uvpt[];     /* VA of "virtual page table" */
+extern volatile pde_t uvpd[];     /* VA of current page directory */
+extern volatile pdpe_t uvpdp[];   /* VA of current page directory pointer */
 extern volatile pml4e_t uvpml4[]; /* VA of current page map level 4 */
 #endif
 
@@ -246,10 +246,10 @@ extern volatile pml4e_t uvpml4[]; /* VA of current page map level 4 */
  */
 
 struct PageInfo {
-  /* Next page on the free list */
-  struct PageInfo *pp_link;
+    /* Next page on the free list */
+    struct PageInfo *pp_link;
 
-  /* pp_ref is the count of pointers minus one (usually in page table entries)
+    /* pp_ref is the count of pointers minus one (usually in page table entries)
    * to this page, for pages allocated using page_alloc.
    *
    * Pages allocated at boot time using pmap.c's
@@ -261,7 +261,7 @@ struct PageInfo {
    * after useage (or page_free if there is exactly once pointer left)
    */
 
-  uint32_t pp_ref;
+    uint32_t pp_ref;
 };
 
 #endif /* !__ASSEMBLER__ */

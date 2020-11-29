@@ -330,52 +330,52 @@ typedef unsigned short Dwarf_Half; /* 2 byte unsigned value */
 typedef unsigned char Dwarf_Small; /* 1 byte unsigned value */
 
 struct Dwarf_Addrs {
-  const unsigned char *abbrev_begin;
-  const unsigned char *abbrev_end;
-  const unsigned char *aranges_begin;
-  const unsigned char *aranges_end;
-  const unsigned char *info_begin;
-  const unsigned char *info_end;
-  const unsigned char *line_begin;
-  const unsigned char *line_end;
-  const unsigned char *str_begin;
-  const unsigned char *str_end;
-  const unsigned char *pubnames_begin;
-  const unsigned char *pubnames_end;
-  const unsigned char *pubtypes_begin;
-  const unsigned char *pubtypes_end;
+    const unsigned char *abbrev_begin;
+    const unsigned char *abbrev_end;
+    const unsigned char *aranges_begin;
+    const unsigned char *aranges_end;
+    const unsigned char *info_begin;
+    const unsigned char *info_end;
+    const unsigned char *line_begin;
+    const unsigned char *line_end;
+    const unsigned char *str_begin;
+    const unsigned char *str_end;
+    const unsigned char *pubnames_begin;
+    const unsigned char *pubnames_end;
+    const unsigned char *pubtypes_begin;
+    const unsigned char *pubtypes_end;
 };
 
 /* Unaligned read from address `addr` */
-#define get_unaligned(addr, type) ({          \
-  type val;                                   \
-  memcpy((void *)&val, (addr), sizeof(type)); \
-  val;                                        \
+#define get_unaligned(addr, type) ({            \
+    type val;                                   \
+    memcpy((void *)&val, (addr), sizeof(type)); \
+    val;                                        \
 })
 
 /* Write value `val` to unaligned address `addr` */
-#define put_unaligned(val, addr) ({                        \
-  void *__ptr = (addr);                                    \
-  switch (sizeof(*(addr))) {                               \
-    case 1:                                                \
-      *(uint8_t *)__ptr = (uint8_t)(uintptr_t)(val);       \
-      break;                                               \
-    case 2: {                                              \
-      uint16_t __var = (uint16_t)(uintptr_t)(val);         \
-      memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
-    } break;                                               \
-    case 4: {                                              \
-      uint32_t __var = (uint32_t)(uintptr_t)(val);         \
-      memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
-    } break;                                               \
-    case 8: {                                              \
-      uint64_t __var = (uint64_t)(uintptr_t)(val);          \
-      memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
-    } break;                                               \
-    default:                                               \
-      panic("Bad unaligned access");                       \
-      break;                                               \
-  }                                                        \
+#define put_unaligned(val, addr) ({                          \
+    void *__ptr = (addr);                                    \
+    switch (sizeof(*(addr))) {                               \
+    case 1:                                                  \
+        *(uint8_t *)__ptr = (uint8_t)(uintptr_t)(val);       \
+        break;                                               \
+    case 2: {                                                \
+        uint16_t __var = (uint16_t)(uintptr_t)(val);         \
+        memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
+    } break;                                                 \
+    case 4: {                                                \
+        uint32_t __var = (uint32_t)(uintptr_t)(val);         \
+        memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
+    } break;                                                 \
+    case 8: {                                                \
+        uint64_t __var = (uint64_t)(uintptr_t)(val);         \
+        memcpy(addr, (const void *)&__var, sizeof(*(addr))); \
+    } break;                                                 \
+    default:                                                 \
+        panic("Bad unaligned access");                       \
+        break;                                               \
+    }                                                        \
 })
 
 int info_by_address(const struct Dwarf_Addrs *addrs, uintptr_t p, Dwarf_Off *store);
@@ -393,77 +393,78 @@ int naive_address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname, u
  */
 static inline uint32_t
 dwarf_entry_len(const uint8_t *addr, uint64_t *len) {
-  uint64_t initial_len = get_unaligned(addr, uint32_t);
-  uint64_t count = sizeof(uint32_t);
+    uint64_t initial_len = get_unaligned(addr, uint32_t);
+    uint64_t count = sizeof(uint32_t);
 
-  /* An initial length field value in the range DW_LEN_EXT_LO -
+    /* An initial length field value in the range DW_LEN_EXT_LO -
    * DW_LEN_EXT_HI indicates an extension, and should not be
    * interpreted as a length. The only extension that we currently
    * understand is the use of DWARF64 addresses */
-  if (initial_len >= DW_EXT_LO && initial_len <= DW_EXT_HI) {
-    /* The 64-bit length field immediately follows the
+    if (initial_len >= DW_EXT_LO && initial_len <= DW_EXT_HI) {
+        /* The 64-bit length field immediately follows the
      * compulsory 32-bit length field */
-    if (initial_len == DW_EXT_DWARF64) {
-      *len  = get_unaligned((uint64_t *)addr + sizeof(uint32_t), uint64_t);
-      count += sizeof(uint64_t);
-    } else {
-      cprintf("Unknown DWARF extension\n");
-      count = 0;
-    }
-  } else *len = initial_len;
+        if (initial_len == DW_EXT_DWARF64) {
+            *len = get_unaligned((uint64_t *)addr + sizeof(uint32_t), uint64_t);
+            count += sizeof(uint64_t);
+        } else {
+            cprintf("Unknown DWARF extension\n");
+            count = 0;
+        }
+    } else
+        *len = initial_len;
 
-  return count;
+    return count;
 }
 
 /* Decode an unsigned LEB128 encoded datum. The algorithm is taken from Appendix C
  * of the DWARF 4 spec. Return the number of bytes read */
 static inline uint64_t
 dwarf_read_uleb128(const uint8_t *addr, uint64_t *ret) {
-  uint64_t result = 0;
-  size_t shift = 0, count = 0;
-  uint8_t byte;
+    uint64_t result = 0;
+    size_t shift = 0, count = 0;
+    uint8_t byte;
 
-  do {
-    byte = *addr++;
-    result |= (byte & 0x7FULL) << shift;
-    shift += 7;
-    count++;
-  } while (byte & 0x80 && shift < 64);
+    do {
+        byte = *addr++;
+        result |= (byte & 0x7FULL) << shift;
+        shift += 7;
+        count++;
+    } while (byte & 0x80 && shift < 64);
 
-  while (byte & 0x80) {
-    byte = *addr++;
-    count++;
-  }
+    while (byte & 0x80) {
+        byte = *addr++;
+        count++;
+    }
 
-  *ret = result;
-  return count;
+    *ret = result;
+    return count;
 }
 
 /* Decode signed LEB128 data. The Algorithm is taken from Appendix C
  * of the DWARF 4 spec. Return the number of bytes read */
 static inline uint64_t
 dwarf_read_leb128(const char *addr, int64_t *ret) {
-  size_t shift = 0, count = 0;
-  uint64_t result = 0;
-  uint8_t byte;
+    size_t shift = 0, count = 0;
+    uint64_t result = 0;
+    uint8_t byte;
 
-  do {
-    byte = *addr++;
-    result |= (byte & 0x7FULL) << shift;
-    shift += 7;
-    count++;
-  } while (byte & 0x80 && shift < 64);
+    do {
+        byte = *addr++;
+        result |= (byte & 0x7FULL) << shift;
+        shift += 7;
+        count++;
+    } while (byte & 0x80 && shift < 64);
 
-  while (byte & 0x80) {
-    byte = *addr++;
-    count++;
-  }
+    while (byte & 0x80) {
+        byte = *addr++;
+        count++;
+    }
 
-  /* The number of bits in a signed integer. */
-  if (shift < 8 * sizeof(result) && byte & 0x40)
-    result |= (-1U << shift);
+    /* The number of bits in a signed integer. */
+    if (shift < 8 * sizeof(result) && byte & 0x40)
+        result |= (-1U << shift);
 
-  *ret = result;
-  return count;
+    *ret = result;
+    return count;
 }
 #endif

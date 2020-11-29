@@ -71,7 +71,9 @@ int sys_ipc_recv(void *rcv_pg);
 static inline envid_t __attribute__((always_inline))
 sys_exofork(void) {
     envid_t ret;
-    asm volatile("int %2" : "=a"(ret) : "a"(SYS_exofork), "i"(T_SYSCALL));
+    asm volatile("int %2"
+                 : "=a"(ret)
+                 : "a"(SYS_exofork), "i"(T_SYSCALL));
     return ret;
 }
 
@@ -82,7 +84,7 @@ envid_t ipc_find_env(enum EnvType type);
 
 /* fork.c */
 #define PTE_SHARE 0x400
-#define PTE_UWP (PTE_P | PTE_U| PTE_W)
+#define PTE_UWP   (PTE_P | PTE_U | PTE_W)
 envid_t fork(void);
 envid_t sfork(void);
 
