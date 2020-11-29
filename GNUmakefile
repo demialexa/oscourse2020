@@ -55,12 +55,12 @@ TOP = .
 ifdef JOSLLVM
 
 CC	:= clang -target x86_64-gnu-linux -pipe
-AS	:= llvm-as
-AR	:= llvm-ar
+AS	:= as
+AR	:= ar
 LD	:= ld.lld
-OBJCOPY	:= llvm/gnu-objcopy
-OBJDUMP	:= llvm-objdump
-NM	:= llvm-nm
+OBJCOPY	:= objcopy
+OBJDUMP	:= objdump
+NM	:= nm
 
 EXTRA_CFLAGS	:= $(EXTRA_CFLAGS) -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member -Wno-frame-address
 
@@ -161,12 +161,19 @@ ifdef KASAN
 
 CFLAGS += -DSAN_ENABLE_KASAN
 
+# ***ITS REGEX TIME!***
+# Instead of trying to keep all these addresses in sync
+# just find them
+
 # We need to find KERN_SHADOW_BASE and KERNBASE separately
 # since SANITIZE_SHADOW_OFF is defined in terms of them and we need evaluated equvaluent
+
 KERNBASE != sed -n 's/\#define KERNBASE \(.*\)/\1/p' inc/memlayout.h
+KERNOFF != sed -n 's/\#define KERN_START_OFFSET \(.*\)/\1/p' inc/memlayout.h
 KERN_SHADOW_BASE != sed -n 's/\#define SANITIZE_SHADOW_BASE \(.*\)/\1/p' inc/memlayout.h
+
 KERN_SAN_CFLAGS := -fsanitize=address -fsanitize-blacklist=llvm/blacklist.txt -mllvm
-KERN_SAN_CFLAGS += $(shell printf "\-asan-mapping-offset=0x%x" $$(($(KERN_SHADOW_BASE) - $(KERNBASE)/8)))
+KERN_SAN_CFLAGS += $(shell printf "\-asan-mapping-offset=0x%x" $$(($(KERN_SHADOW_BASE) - ($(KERNBASE) + $(KERNOFF))/8)))
 
 KERN_SAN_LDFLAGS := --wrap memcpy  \
 	--wrap memset  \
@@ -408,7 +415,7 @@ format:
 
 # For deleting the build
 clean:
-	rm -rf $(OBJDIR) .gdbinit jos.in qemu.log $(JOS_LOADER) $(JOS_LOADER_BUILD) $(JOS_ESP)
+	rm -rf $(OBJDIR) .gdbinit jos.in qemu.log $(JOS_LOADER) $(JOS_LOADER_BUILD) $(JOS_ESP) kern/kernel.ld
 
 realclean: clean
 	rm -rf lab$(LAB).tar.gz \

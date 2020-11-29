@@ -93,8 +93,12 @@
  *     at UTEMP.
  */
 
-/* All physical memory mapped at this address */
+/* All physical memory mapped at this address
+ * (this *should* be defined as a literal number) */
 #define KERNBASE 0x8040000000
+/* Kernel main core base address in physical memory
+ * (this *should* be defined as a literal number) */
+#define KERN_START_OFFSET 0x01600000
 
 /* At IOPHYSMEM (640K) there is a 384K hole for I/O.  From the kernel,
  * IOPHYSMEM can be addressed at KERNBASE + IOPHYSMEM.  The hole ends
@@ -160,13 +164,16 @@
 
 
 #ifdef SAN_ENABLE_KASAN
+
+/* (this *should* be defined as a literal number) */
 #define SANITIZE_SHADOW_BASE 0x8080000000
 /* SANITIZE_SHADOW_SIZE of 32 MB allows 256 MB of addressible memory (due to byte granularity). */
 #define SANITIZE_SHADOW_SIZE 0x8000000
-#define SANITIZE_SHADOW_OFF (SANITIZE_SHADOW_BASE - (KERNBASE >> 3))
+#define SANITIZE_SHADOW_OFF (SANITIZE_SHADOW_BASE - ((KERNBASE + KERN_START_OFFSET) >> 3))
 #endif
 
 #ifdef SAN_ENABLE_UASAN
+/* (this *should* be defined as a literal number) */
 #define SANITIZE_USER_SHADOW_BASE 0x21000000
 #define SANITIZE_USER_SHADOW_SIZE 0x3000000
 #define SANITIZE_USER_SHADOW_OFF SANITIZE_USER_SHADOW_BASE

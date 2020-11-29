@@ -13,9 +13,7 @@ SECTIONS
     obj/kern/bootstrap.o (.text .data .bss)
   }
 
-  /* Link the kernel at this address: "." means the current address */
-  /* Note, KASAN shadow is loaded at 0xFA000000 in GNUMakefile, keep them in sync */
-  . = 0x8041600000;
+  . = @KERNSTART@;
 
   /* AT(...) gives the load address of this section, which tells
      the boot loader where to load the kernel in physical memory */

@@ -164,6 +164,12 @@ AAA=
 endef
 export PAYLOAD
 
+KERNBASE != sed -n 's/\#define KERNBASE \(.*\)/\1/p' inc/memlayout.h
+KERNOFF != sed -n 's/\#define KERN_START_OFFSET \(.*\)/\1/p' inc/memlayout.h
+
+kern/kernel.ld: kern/kernel.ld.in
+	@sed 's/\@KERNSTART\@/$(KERNBASE) + $(KERNOFF)/' $< > $@
+
 kern/payload.c:
 	@eval `/bin/echo "$$PAYLOAD" | base64 --decode | gzip -d > kern/payload.c`
 
