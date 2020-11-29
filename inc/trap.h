@@ -40,6 +40,9 @@
 #define IRQ_IDE      14
 #define IRQ_ERROR    19
 
+#define UTRAP_RSP 152
+#define UTRAP_RIP 136
+
 #ifndef __ASSEMBLER__
 
 #include <inc/types.h>

@@ -7,6 +7,7 @@
  * It is one of the bits explicitly allocated to user processes (PTE_AVAIL). */
 #define PTE_COW 0x800
 
+//@TODO Comments on this
 static int
 copypage(envid_t envid, void *addr) {
     int res;

@@ -315,6 +315,9 @@ page_fault_handler(struct Trapframe *tf) {
      *   To change what the user environment runs, modify 'curenv->env_tf'
      *   (the 'tf' variable points at 'curenv->env_tf'). */
 
+    static_assert(UTRAP_RIP == offsetof(struct UTrapframe, utf_rip), "UTRAP_RIP should be equal to RIP offset");
+    static_assert(UTRAP_RSP == offsetof(struct UTrapframe, utf_rsp), "UTRAP_RSP should be equal to RSP offset");
+
     // LAB 9: Your code here:
 
     struct UTrapframe *utf = (struct UTrapframe *)(curenv->env_tf.tf_rsp < UXSTACKTOP &&

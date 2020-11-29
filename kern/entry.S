@@ -59,21 +59,7 @@ save_trapframe:
     pushq $0x0 # %ds
     pushq $0x0 # %es
 
-    pushq %rax
-    pushq %rbx
-    pushq %rcx
-    pushq %rdx
-    pushq %rbp
-    pushq %rdi
-    pushq %rsi
-    pushq %r8
-    pushq %r9
-    pushq %r10
-    pushq %r11
-    pushq %r12
-    pushq %r13
-    pushq %r14
-    pushq %r15
+    PUSHA
 
     xor %ebp, %ebp
     movq %rsp, %rdi

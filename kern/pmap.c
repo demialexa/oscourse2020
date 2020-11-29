@@ -235,7 +235,7 @@ mem_init(void) {
     boot_map_region(kern_pml4, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 
     /* Additionally map stack to lower 32-bit addresses. */
-    boot_map_region(kern_pml4, X86ADDR(KSTACKTOP - KSTKSIZE), KSTKSIZE, PADDR(bootstack), PTE_P | PTE_W);
+    boot_map_region(kern_pml4, X86ADDR(KSTACKTOP - KSTKSIZE), KSTKSIZE, PADDR(bootstack), PTE_W);
 
     /* Map all of physical memory at KERNBASE.
      * Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -248,7 +248,7 @@ mem_init(void) {
     boot_map_region(kern_pml4, KERNBASE, npages*PAGE_SIZE, 0, PTE_W);
 
     /* Additionally map kernel to lower 32-bit addresses. Assumes kernel should not exceed 50 mb. */
-    boot_map_region(kern_pml4, X86ADDR(KERNBASE), MIN(0x3200000, npages * PAGE_SIZE), 0, PTE_P | PTE_W);
+    boot_map_region(kern_pml4, X86ADDR(KERNBASE), MIN(0x3200000, npages * PAGE_SIZE), 0, PTE_W);
 
     /* Map the UEFI runtime virtual memory to it corresponding physical address.
      *     Permissions: kernel RW, user NONE */
@@ -257,7 +257,7 @@ mem_init(void) {
     for (; start < end; start = (void *)((uint8_t *)start + uefi_lp->MemoryMapDescriptorSize)) {
         if (start->Attribute & EFI_MEMORY_RUNTIME) {
             boot_map_region(kern_pml4, (uintptr_t)start->VirtualStart,
-            start->NumberOfPages * PAGE_SIZE, (uintptr_t)start->PhysicalStart, PTE_P | PTE_W);
+            start->NumberOfPages * PAGE_SIZE, (uintptr_t)start->PhysicalStart, PTE_W);
         }
     }
 
@@ -278,21 +278,19 @@ mem_init(void) {
 
     /* entry.S set the really important flags in cr0.
      * Here we configure the rest of the flags that we care about. */
-    {
-        uintptr_t cr0 = rcr0();
-        cr0 |= CR0_PE | CR0_PG | CR0_AM | CR0_WP | CR0_NE | CR0_MP;
-        cr0 &= ~(CR0_TS | CR0_EM);
-        lcr0(cr0);
-    }
+    uintptr_t cr0 = rcr0();
+    cr0 |= CR0_PE | CR0_PG | CR0_AM | CR0_WP | CR0_NE | CR0_MP;
+    cr0 &= ~(CR0_TS | CR0_EM);
+    lcr0(cr0);
 
     /* Map the frame buffer from UEFI using base address as physical address
      * and mapping only the required passed amount of memory.
      *     Permissions: kernel RW, user NONE */
     LOADER_PARAMS *lp  = (LOADER_PARAMS *)uefi_lp;
     uintptr_t physaddr = lp->FrameBufferBase;
-    uintptr_t size     = lp->FrameBufferSize;
+    uintptr_t size = lp->FrameBufferSize;
 
-    boot_map_region(kern_pml4, FBUFFBASE, size, physaddr, PTE_P | PTE_W);
+    boot_map_region(kern_pml4, FBUFFBASE, size, physaddr, PTE_W);
 
     /* Some more checks, only possible after kern_pml4 is installed. */
     check_page_installed_pml4();
@@ -353,15 +351,13 @@ is_reserved_region(EFI_MEMORY_DESCRIPTOR *desc) {
 /* Check if page is allocatable according to saved UEFI MemMap */
 void
 mark_reserved(void) {
-    size_t start_p, end_p;
-
     /* Mark first page as reserved to preserve BIOS data */
     reserve(&pages[0], 1);
 
     /* The IO hole [IOPHYSMEM, EXTPHYSMEM) is also reserved,
      * which is followed by kernel and early boot allocation pool */
-    start_p = IOPHYSMEM/PAGE_SIZE;
-    end_p = PADDR(boot_alloc(0))/PAGE_SIZE;
+    size_t start_p = IOPHYSMEM/PAGE_SIZE;
+    size_t end_p = PADDR(boot_alloc(0))/PAGE_SIZE;
     while(start_p < end_p) reserve(&pages[start_p++], 1);
 
     /* Mark pages reserved by UEFI if memory map is present */
@@ -635,9 +631,9 @@ page_remove(pml4e_t *pml4e, void *va) {
 /* Invalidate a TLB entry, but only if the page tables being
  * edited are the ones currently in use by the processor. */
 void
-tlb_invalidate(pml4e_t *pml4e, void *va) {
+tlb_invalidate(pml4e_t *pml4, void *va) {
     /* Flush the entry only if we're modifying the current address space. */
-    if (!curenv || curenv->env_pagetable == pml4e) invlpg(va);
+    if (!curenv || curenv->env_pagetable == pml4) invlpg(va);
 }
 
 

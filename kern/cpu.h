@@ -12,9 +12,6 @@
 /* Used by x86 to find stack for interrupt */
 extern struct Taskstate cpu_ts; 
 
-/* kernel stack */
-extern unsigned char kstack[KSTKSIZE];
-
 extern char in_intr;
 extern bool in_clk_intr;
 
