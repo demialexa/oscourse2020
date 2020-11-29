@@ -42,9 +42,8 @@ union Fsipc *fsreq = (union Fsipc *)0x0ffff000;
 
 void
 serve_init(void) {
-    size_t i;
     uintptr_t va = FILEVA;
-    for (i = 0; i < MAXOPEN; i++) {
+    for (size_t i = 0; i < MAXOPEN; i++) {
         opentab[i].o_fileid = i;
         opentab[i].o_fd = (struct Fd *)va;
         va += PAGE_SIZE;
@@ -56,7 +55,7 @@ int
 openfile_alloc(struct OpenFile **o) {
 
     /* Find an available open-file table entry */
-    for (int i = 0; i < MAXOPEN; i++) {
+    for (size_t i = 0; i < MAXOPEN; i++) {
         switch (pageref(opentab[i].o_fd)) {
         case 0: {
             int res = sys_page_alloc(0, opentab[i].o_fd, PTE_UWP);

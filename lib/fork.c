@@ -7,12 +7,32 @@
  * It is one of the bits explicitly allocated to user processes (PTE_AVAIL). */
 #define PTE_COW 0x800
 
+static int
+copypage(envid_t envid, void *addr) {
+    int res;
+
+    res = sys_page_alloc(CURENVID, PFTEMP, PTE_UWP);
+    if (res < 0) return res;
+
+#ifdef SANITIZE_USER_SHADOW_BASE
+    __nosan_memcpy(PFTEMP, addr, PAGE_SIZE);
+#else
+    memcpy(PFTEMP, addr, PAGE_SIZE);
+#endif
+
+    pte_t ent = uvpt[VPT(addr)] & PTE_SYSCALL;
+    if (ent & PTE_COW) ent = (ent & ~PTE_COW) | PTE_W;
+
+    res = sys_page_map(CURENVID, PFTEMP, envid, addr, ent);
+    if (res < 0) return res;
+
+    return sys_page_unmap(CURENVID, PFTEMP);
+}
+
 /* Custom page fault handler - if faulting page is copy-on-write,
  * map in our own private writable copy. */
 static void
 pgfault(struct UTrapframe *utf) {
-    int res;
-
     /* Check that the faulting access was (1) a write, and (2) to a
      * copy-on-write page.  If not, panic.
      * Hint:
@@ -20,7 +40,7 @@ pgfault(struct UTrapframe *utf) {
      *   (see <inc/memlayout.h>). */
 
     // LAB 9: Your code here
-    pte_t ent = get_uvpt_entry((void *)utf->utf_fault_va);
+    pte_t ent = get_uvpt_entry((void *)utf->utf_fault_va) & PTE_SYSCALL;
     if ((ent & (PTE_COW | PTE_P)) != (PTE_P | PTE_COW) || !(utf->utf_err & FEC_WR))
         panic("User pagefault at va=%p ip=%p\n", (void *)utf->utf_fault_va, (void *)utf->utf_rip);
 
@@ -36,23 +56,9 @@ pgfault(struct UTrapframe *utf) {
     void *addr = (void *)ROUNDDOWN(utf->utf_fault_va, PAGE_SIZE);
 
     /* Only one reference, no need to copy */
-    if (pageref(addr) != 1 || sys_page_map(CURENVID, addr, CURENVID, addr, PTE_UWP) < 0) {
+    if (pageref(addr) != 1 || sys_page_map(CURENVID, addr, CURENVID, addr, (ent & ~PTE_COW) | PTE_W) < 0) {
         /* If remapping failed or there's more (or less) than one ref, we need to copy */
-
-        res = sys_page_alloc(CURENVID, PFTEMP, PTE_UWP);
-        if (res < 0) panic("[pagefault] sys_page_alloc: %i\n", res);
-
-#ifdef SANITIZE_USER_SHADOW_BASE
-        __nosan_memcpy(PFTEMP, addr, PAGE_SIZE);
-#else
-        memcpy(PFTEMP, addr, PAGE_SIZE);
-#endif
-
-        res = sys_page_map(CURENVID, PFTEMP, CURENVID, addr, PTE_UWP);
-        if (res < 0) panic("[pagefault] sys_page_map: %i\n", res);
-
-        res = sys_page_unmap(CURENVID, PFTEMP);
-        if (res < 0) panic("[pagefault] sys_page_unmap: %i\n", res);
+        copypage(CURENVID, addr);
     }
 }
 
@@ -72,7 +78,7 @@ duppage(envid_t envid, void *addr) {
     pte_t ent = uvpt[VPT(addr)] & PTE_SYSCALL;
 
     int res;
-    if (ent & PTE_W) {
+    if (ent & (PTE_W | PTE_COW)) {
         ent = (ent | PTE_COW) & ~PTE_W;
 
         res = sys_page_map(CURENVID, addr, envid, addr, ent);
@@ -85,6 +91,7 @@ duppage(envid_t envid, void *addr) {
 
     return res;
 }
+
 
 /* User-level fork with copy-on-write.
  * Set up our page fault handler appropriately.
@@ -128,13 +135,13 @@ fork(void) {
 
         if (
 #ifdef SANITIZE_USER_SHADOW_BASE
-#define _IN(x)  (addr >= ROUNDDOWN(SANITIZE_USER##x##SHADOW_BASE, PAGE_SIZE) &&\
-                 addr < ROUNDUP(SANITIZE_USER##x##SHADOW_BASE + SANITIZE_USER##x##SHADOW_SIZE, PAGE_SIZE))
+#define _IN(x)  ((uintptr_t)addr >= ROUNDDOWN(SANITIZE_USER##x##SHADOW_BASE, PAGE_SIZE) &&\
+                 (uintptr_t)addr < ROUNDUP(SANITIZE_USER##x##SHADOW_BASE + SANITIZE_USER##x##SHADOW_SIZE, PAGE_SIZE))
                 _IN(_) || _IN(_EXTRA_) || _IN(_FS_) || _IN(_VPT_) ||
 #undef _IN
 #endif
                 (((uintptr_t)addr - UXSTACKTOP + UXSTACKSIZE) < UXSTACKSIZE)) {
-            res = sys_page_alloc(child, addr, PTE_UWP);
+            res = copypage(child, addr);
         } else if (ent & PTE_SHARE) {
             res = sys_page_map(CURENVID, addr, child, addr, ent & PTE_SYSCALL);
         } else {

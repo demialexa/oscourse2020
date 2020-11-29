@@ -82,7 +82,7 @@ map_addr_early_boot(uintptr_t va, uintptr_t pa, size_t sz) {
             pd = alloc_pd_early_boot();
             pdp[PDP_INDEX(vstart)] = (uintptr_t)pd | PTE_P | PTE_W;
         }
-        pd[PD_INDEX(vstart)] = pstart | PTE_P | PTE_W | PTE_PS | PTE_G;
+        pd[PD_INDEX(vstart)] = pstart | PTE_P | PTE_W | PTE_PS;
     }
 }
 

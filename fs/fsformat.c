@@ -117,7 +117,7 @@ finishdisk(void) {
     int r, i;
 
     for (i = 0; i < blockof(diskpos); ++i)
-        bitmap[i / 32] &= ~(1 << (i % 32));
+        bitmap[i / 32] &= ~(1U << (i % 32));
 
     if ((r = msync(diskmap, nblocks * BLKSIZE, MS_SYNC)) < 0)
         panic("msync: %s", strerror(errno));
