@@ -183,7 +183,8 @@ region_alloc(struct Env *env, void *va, size_t len) {
 
     void *end = ROUNDUP(va + len, PAGE_SIZE);
     va = ROUNDDOWN(va, PAGE_SIZE);
-    cprintf ("region: %p %lu -> %p\n", va, end - va, end);
+
+    cprintf ("\tregion[%p;%p]\n", va, end - 1);
 
     while (va < end) {
         struct PageInfo *pi = page_alloc(0);
@@ -236,7 +237,6 @@ env_setup_vm(struct Env *env) {
     for (size_t i = NUSERPML4; i < PML4_ENTRY_COUNT; i++)
         if (kern_pml4[i] & PTE_P && i != PML4_INDEX(UVPT))
             pa2page(PTE_ADDR(kern_pml4[i]))->pp_ref++;
-
 
     env->env_pagetable = page2kva(pi);
     env->env_cr3 = page2pa(pi);

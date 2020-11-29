@@ -15,7 +15,6 @@
 #include <kern/timer.h>
 
 static struct Taskstate ts;
-extern struct Segdesc32 gdt[];
 
 /* For debugging, so print_trapframe can distinguish between printing
  * a saved trapframe and printing the current trapframe and print some
@@ -62,56 +61,42 @@ trapname(int trapno) {
 void
 trap_init(void) {
     // LAB 4: Your code here
-    extern void clock_thdlr(void);
-    extern void timer_thdlr(void);
-    SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, (uintptr_t)(&timer_thdlr), 0);
-    SETGATE(idt[IRQ_OFFSET + IRQ_CLOCK], 0, GD_KT, (uintptr_t)(&clock_thdlr), 0);
+    extern void clock_thdlr(void), timer_thdlr(void);
+    idt[IRQ_OFFSET + IRQ_TIMER] = GATE(0, GD_KT, (uintptr_t)(&timer_thdlr), 0);
+    idt[IRQ_OFFSET + IRQ_CLOCK] = GATE(0, GD_KT, (uintptr_t)(&clock_thdlr), 0);
 
     // LAB 8: Your code here
-    extern void trap_divide(void);
-    extern void trap_debig(void);
-    extern void trap_nmi(void);
-    extern void trap_brkpt(void);
-    extern void trap_oflow(void);
-    extern void trap_bound(void);
-    extern void trap_illop(void);
-    extern void trap_device(void);
-    extern void trap_dblflt(void);
-    extern void trap_tss(void);
-    extern void trap_segnp(void);
-    extern void trap_stack(void);
-    extern void trap_gpflt(void);
-    extern void trap_pgflt(void);
-    extern void trap_fperr(void);
-    extern void trap_align(void);
-    extern void trap_mchk(void);
-    extern void trap_simderr(void);
-    extern void trap_syscall(void);
-    SETGATE(idt[T_DIVIDE], 0, GD_KT, (uintptr_t)(&trap_divide), 0)
-    SETGATE(idt[T_DEBUG], 0, GD_KT, (uintptr_t)(&trap_debig), 0)
-    SETGATE(idt[T_NMI], 0, GD_KT, (uintptr_t)(&trap_nmi), 0)
-    SETGATE(idt[T_BRKPT], 0, GD_KT, (uintptr_t)(&trap_brkpt), 3)
-    SETGATE(idt[T_OFLOW], 0, GD_KT, (uintptr_t)(&trap_oflow), 0)
-    SETGATE(idt[T_BOUND], 0, GD_KT, (uintptr_t)(&trap_bound), 0)
-    SETGATE(idt[T_ILLOP], 0, GD_KT, (uintptr_t)(&trap_illop), 0)
-    SETGATE(idt[T_DEVICE], 0, GD_KT, (uintptr_t)(&trap_device), 0)
-    SETGATE(idt[T_DBLFLT], 0, GD_KT, (uintptr_t)(&trap_dblflt), 0)
-    SETGATE(idt[T_TSS], 0, GD_KT, (uintptr_t)(&trap_tss), 0)
-    SETGATE(idt[T_SEGNP], 0, GD_KT, (uintptr_t)(&trap_segnp), 0)
-    SETGATE(idt[T_STACK], 0, GD_KT, (uintptr_t)(&trap_stack), 0)
-    SETGATE(idt[T_GPFLT], 0, GD_KT, (uintptr_t)(&trap_gpflt), 0)
-    SETGATE(idt[T_PGFLT], 0, GD_KT, (uintptr_t)(&trap_pgflt), 0)
-    SETGATE(idt[T_FPERR], 0, GD_KT, (uintptr_t)(&trap_fperr), 0)
-    SETGATE(idt[T_ALIGN], 0, GD_KT, (uintptr_t)(&trap_align), 0)
-    SETGATE(idt[T_MCHK], 0, GD_KT, (uintptr_t)(&trap_mchk), 0)
-    SETGATE(idt[T_SIMDERR], 0, GD_KT, (uintptr_t)(&trap_simderr), 0)
-    SETGATE(idt[T_SYSCALL], 0, GD_KT, (uintptr_t)(&trap_syscall), 3)
+    extern void trap_divide(void), trap_debig(void), trap_nmi(void),
+    trap_brkpt(void), trap_oflow(void), trap_bound(void), trap_illop(void),
+    trap_device(void), trap_dblflt(void), trap_tss(void), trap_segnp(void),
+    trap_stack(void), trap_gpflt(void), trap_pgflt(void), trap_fperr(void),
+    trap_align(void), trap_mchk(void), trap_simderr(void), trap_syscall(void);
+
+    idt[T_DIVIDE] = GATE(0, GD_KT, (uintptr_t)(&trap_divide), 0);
+    idt[T_DEBUG] = GATE(0, GD_KT, (uintptr_t)(&trap_debig), 0);
+    idt[T_NMI] = GATE(0, GD_KT, (uintptr_t)(&trap_nmi), 0);
+    idt[T_BRKPT] = GATE(0, GD_KT, (uintptr_t)(&trap_brkpt), 3);
+    idt[T_OFLOW] = GATE(0, GD_KT, (uintptr_t)(&trap_oflow), 0);
+    idt[T_BOUND] = GATE(0, GD_KT, (uintptr_t)(&trap_bound), 0);
+    idt[T_ILLOP] = GATE(0, GD_KT, (uintptr_t)(&trap_illop), 0);
+    idt[T_DEVICE] = GATE(0, GD_KT, (uintptr_t)(&trap_device), 0);
+    idt[T_DBLFLT] = GATE(0, GD_KT, (uintptr_t)(&trap_dblflt), 0);
+    idt[T_TSS] = GATE(0, GD_KT, (uintptr_t)(&trap_tss), 0);
+    idt[T_SEGNP] = GATE(0, GD_KT, (uintptr_t)(&trap_segnp), 0);
+    idt[T_STACK] = GATE(0, GD_KT, (uintptr_t)(&trap_stack), 0);
+    idt[T_GPFLT] = GATE(0, GD_KT, (uintptr_t)(&trap_gpflt), 0);
+    idt[T_PGFLT] = GATE(0, GD_KT, (uintptr_t)(&trap_pgflt), 0);
+    idt[T_FPERR] = GATE(0, GD_KT, (uintptr_t)(&trap_fperr), 0);
+    idt[T_ALIGN] = GATE(0, GD_KT, (uintptr_t)(&trap_align), 0);
+    idt[T_MCHK] = GATE(0, GD_KT, (uintptr_t)(&trap_mchk), 0);
+    idt[T_SIMDERR] = GATE(0, GD_KT, (uintptr_t)(&trap_simderr), 0);
+    idt[T_SYSCALL] = GATE(0, GD_KT, (uintptr_t)(&trap_syscall), 3);
 
     // LAB 11: Your code here
-    extern void serial_thdlr(void);
-    extern void kbd_thdlr(void);
-    SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, (uintptr_t)(&kbd_thdlr), 0);
-    SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, (uintptr_t)(&serial_thdlr), 0);
+    extern void serial_thdlr(void), kbd_thdlr(void);
+
+    idt[IRQ_OFFSET + IRQ_KBD] = GATE(0, GD_KT, (uintptr_t)(&kbd_thdlr), 0);
+    idt[IRQ_OFFSET + IRQ_SERIAL] = GATE(0, GD_KT, (uintptr_t)(&serial_thdlr), 0);
 
     /* Per-CPU setup */
     trap_init_percpu();
