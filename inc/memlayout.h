@@ -192,7 +192,7 @@
 
 /* UVPT is located at another specific address space */
 #define SANITIZE_USER_VPT_SHADOW_BASE ((UVPT >> 3) + SANITIZE_USER_SHADOW_OFF)
-#define SANITIZE_USER_VPT_SHADOW_SIZE ((((UVPT - UVPML4 + PAGE_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
+#define SANITIZE_USER_VPT_SHADOW_SIZE ((((UVPML4 - UVPT + PAGE_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
 #endif
 
 /* Where user programs generally begin */
