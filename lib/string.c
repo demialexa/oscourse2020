@@ -7,7 +7,7 @@
  * but it makes an even bigger difference on bochs.
  * Primespipe runs 3x faster this way */
 
-#define ASM 1
+#define ASM 0
 
 size_t
 strlen(const char *s) {
@@ -118,7 +118,7 @@ memset(void *v, int c, size_t n) {
     uint8_t *ptr = v;
     ssize_t ni = n;
 
-    if ((ni -= ((uintptr_t)v & 7)) < 0) {
+    if ((ni -= ((8 - (uintptr_t)v & 7)) & 7) < 0) {
         while (n-- > 0) *ptr++ = c;
         return v;
     }

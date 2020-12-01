@@ -28,7 +28,7 @@ __nosan_memset(void *v, int c, size_t n) {
     uint8_t *ptr = v;
     intptr_t ni = n;
 
-    if ((ni -= ((uintptr_t)v & 7)) < 0) {
+    if ((ni -= ((8 - (uintptr_t)v & 7)) & 7) < 0) {
         while (n-- > 0) *ptr++ = c;
         return v;
     }
