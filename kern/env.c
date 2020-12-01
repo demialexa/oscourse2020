@@ -311,7 +311,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, enum EnvType type) {
     // LAB 3: Your code here:
     static uintptr_t stack_top = 0x2000000;
     env->env_tf.tf_rsp = stack_top;
-    stack_top -= USTACKSIZE;
+    stack_top -= PSTACKSIZE;
 #else
     env->env_tf.tf_ds  = GD_UD | 3;
     env->env_tf.tf_es  = GD_UD | 3;
@@ -449,14 +449,14 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
 /* Map UVP shadow memory and create pages if necessary */
 struct PageInfo *uvpt_pages = NULL;
 void
-uvpt_shadow_map(struct Env *e) {
+uvpt_shadow_map(struct Env *env) {
     uintptr_t va = ROUNDDOWN((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE, PAGE_SIZE);
     uintptr_t vend = ROUNDUP((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PAGE_SIZE);
 
     for (struct PageInfo **link = &uvpt_pages; va < vend; va += PAGE_SIZE) {
         if (!*link) *link = page_alloc(ALLOC_ZERO);
 
-        int res = page_insert(e->env_pagetable, *link, (void *)va, PTE_U | PTE_W);
+        int res = page_insert(env->env_pagetable, *link, (void *)va, PTE_U | PTE_W);
         if (res < 0) panic("Cannot allocate any memory for uvpt shadow mem");
 
         link = &(*link)->pp_link;
@@ -630,8 +630,10 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
                 return -E_INVALID_EXE;
             }
 
-            cprintf("Loading section of size 0x%08lX/0x%08lX to %p...\n",
-                (unsigned long)filesz, (unsigned long)memsz, dst);
+            if (debug) {
+                cprintf("Loading section of size 0x%08lX/0x%08lX to %p...\n",
+                    (unsigned long)filesz, (unsigned long)memsz, dst);
+            }
 
             if (region_alloc(env, dst, memsz)) {
                 cprintf("Out of memory\n");

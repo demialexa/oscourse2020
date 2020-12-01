@@ -7,7 +7,7 @@
  * but it makes an even bigger difference on bochs.
  * Primespipe runs 3x faster this way */
 
-#define ASM 0
+#define ASM 1
 
 size_t
 strlen(const char *s) {

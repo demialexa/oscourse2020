@@ -70,11 +70,30 @@ sys_page_alloc(envid_t envid, void *va, int perm) {
 
 int
 sys_page_map(envid_t srcenv, void *srcva, envid_t dstenv, void *dstva, int perm) {
-    return syscall(SYS_page_map, 1, srcenv, (uintptr_t)srcva, dstenv, (uintptr_t)dstva, perm);
+    int res = syscall(SYS_page_map, 1, srcenv, (uintptr_t)srcva, dstenv, (uintptr_t)dstva, perm);
+#ifdef SANITIZE_USER_SHADOW_BASE
+    if (!res) {
+        if (dstenv == CURENVID) {
+            platform_asan_unpoison(ROUNDDOWN(dstva, PAGE_SIZE), PAGE_SIZE);
+        } else {
+            uintptr_t addr = ((uintptr_t)dstva >> 3) + SANITIZE_USER_SHADOW_OFF;
+            uintptr_t paddr = (uintptr_t)ROUNDDOWN(addr, PAGE_SIZE);
+            uintptr_t pdst = (uintptr_t)PFTEMP - PAGE_SIZE;
+            res = syscall(SYS_page_map, 1, srcenv, paddr, CURENVID, pdst, PTE_UWP);
+            // Ignore failures
+            if (res >= 0) {
+                __nosan_memset((void *)pdst + (addr - paddr), 0, PAGE_SIZE/8);
+                syscall(SYS_page_unmap, 1, CURENVID, pdst, 0, 0, 0);
+            }
+        }
+    }
+#endif
+    return res;
 }
 
 int
 sys_page_unmap(envid_t envid, void *va) {
+    // TODO Poison mapped memory
     return syscall(SYS_page_unmap, 1, envid, (uintptr_t)va, 0, 0, 0);
 }
 
@@ -102,5 +121,9 @@ sys_ipc_try_send(envid_t envid, uintptr_t value, void *srcva, int perm) {
 
 int
 sys_ipc_recv(void *dstva) {
-    return syscall(SYS_ipc_recv, 1, (uintptr_t)dstva, 0, 0, 0, 0);
+    int res = syscall(SYS_ipc_recv, 1, (uintptr_t)dstva, 0, 0, 0, 0);
+#ifdef SANITIZE_USER_SHADOW_BASE
+    if (!res) platform_asan_unpoison(ROUNDDOWN(dstva, PAGE_SIZE), PAGE_SIZE);
+#endif
+    return res;
 }
