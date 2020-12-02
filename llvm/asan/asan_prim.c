@@ -28,26 +28,26 @@ __nosan_memset(void *v, int c, size_t n) {
     uint8_t *ptr = v;
     intptr_t ni = n;
 
-    if ((ni -= ((8 - (uintptr_t)v & 7)) & 7) < 0) {
+    if (__builtin_expect((ni -= ((8 - ((uintptr_t)v & 7))) & 7) < 0, 0)) {
         while (n-- > 0) *ptr++ = c;
         return v;
     }
 
     uint64_t k = 0x101010101010101ULL * (c & 0xFFU);
 
-    if ((uintptr_t)ptr & 7) {
+    if (__builtin_expect((uintptr_t)ptr & 7, 0)) {
         if ((uintptr_t)ptr & 1) *ptr = k, ptr += 1;
         if ((uintptr_t)ptr & 2) *(uint16_t *)ptr = k, ptr += 2;
         if ((uintptr_t)ptr & 4) *(uint32_t *)ptr = k, ptr += 4;
     }
 
-    if (ni / 8) {
+    if (__builtin_expect(ni / 8, 1)) {
         asm volatile("cld; rep stosq\n" ::"D"(ptr), "a"(k), "c"(ni / 8)
                      : "cc", "memory");
         ni &= 7;
     }
 
-    if (ni) {
+    if (__builtin_expect(ni, 0)) {
         if (ni & 4) *(uint32_t *)ptr = k, ptr += 4;
         if (ni & 2) *(uint16_t *)ptr = k, ptr += 2;
         if (ni & 1) *ptr = k;

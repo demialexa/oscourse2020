@@ -118,6 +118,17 @@ fork(void) {
 
     if (child <= 0) return child;
 
+#ifdef SANITIZE_USER_SHADOW_BASE
+    for (uintptr_t addr = SANITIZE_USER_SHADOW_BASE; addr < SANITIZE_USER_SHADOW_END; addr += PAGE_SIZE)
+        if ((res = copypage(child, (void *)addr)) < 0) goto error;
+    for (uintptr_t addr = SANITIZE_USER_FS_SHADOW_BASE; addr < SANITIZE_USER_FS_SHADOW_END; addr += PAGE_SIZE)
+        if ((res = copypage(child, (void *)addr)) < 0) goto error;
+    for (uintptr_t addr = SANITIZE_USER_EXTRA_SHADOW_BASE; addr < SANITIZE_USER_EXTRA_SHADOW_END; addr += PAGE_SIZE)
+        if ((res = copypage(child, (void *)addr)) < 0) goto error;
+    for (uintptr_t addr = SANITIZE_USER_VPT_SHADOW_BASE; addr < SANITIZE_USER_VPT_SHADOW_END; addr += PAGE_SIZE)
+        if ((res = sys_page_map(CURENVID, (void *)addr, child, (void *)addr, PTE_UWP)) < 0) goto error;
+#endif
+
     for (char *addr = 0; addr < (char *)UTOP; addr += PAGE_SIZE) {
         if (!(uvpml4[VPML4(addr)] & PTE_P)) {
             addr += HUGE_PAGE_SIZE*PD_ENTRY_COUNT*PDP_ENTRY_COUNT - PAGE_SIZE;
@@ -134,22 +145,32 @@ fork(void) {
         pte_t ent = uvpt[VPT(addr)];
         if (!(ent & PTE_P)) continue;
 
-        if (
+
+        if (((uintptr_t)addr - UXSTACKTOP + UXSTACKSIZE) < UXSTACKSIZE) continue;
 #ifdef SANITIZE_USER_SHADOW_BASE
-#define _IN(x)  ((uintptr_t)addr >= ROUNDDOWN(SANITIZE_USER##x##SHADOW_BASE, PAGE_SIZE) &&\
-                 (uintptr_t)addr < ROUNDUP(SANITIZE_USER##x##SHADOW_BASE + SANITIZE_USER##x##SHADOW_SIZE, PAGE_SIZE))
-                _IN(_) || _IN(_EXTRA_) || _IN(_FS_) || _IN(_VPT_) ||
-#undef _IN
+        else if ((uintptr_t)addr >= SANITIZE_USER_SHADOW_BASE &&
+                 (uintptr_t)addr < SANITIZE_USER_SHADOW_END)
+            addr = (void *)SANITIZE_USER_SHADOW_END - PAGE_SIZE;
+        else if ((uintptr_t)addr >= SANITIZE_USER_EXTRA_SHADOW_BASE &&
+                 (uintptr_t)addr < SANITIZE_USER_EXTRA_SHADOW_END)
+            addr = (void *)SANITIZE_USER_EXTRA_SHADOW_END - PAGE_SIZE;
+        else if ((uintptr_t)addr >= SANITIZE_USER_FS_SHADOW_BASE &&
+                 (uintptr_t)addr < SANITIZE_USER_FS_SHADOW_END)
+            addr = (void *)SANITIZE_USER_FS_SHADOW_END - PAGE_SIZE;
+        else if ((uintptr_t)addr >= SANITIZE_USER_VPT_SHADOW_BASE &&
+                 (uintptr_t)addr < SANITIZE_USER_VPT_SHADOW_END)
+            addr = (void *)SANITIZE_USER_VPT_SHADOW_END - PAGE_SIZE;
 #endif
-                (((uintptr_t)addr - UXSTACKTOP + UXSTACKSIZE) < UXSTACKSIZE)) {
-            res = copypage(child, addr);
-        } else if (ent & PTE_SHARE) {
+        else if (ent & PTE_SHARE) {
             res = sys_page_map(CURENVID, addr, child, addr, ent & PTE_SYSCALL);
         } else {
             res = duppage(child, addr);
         }
         if (res < 0) goto error;
     }
+
+    res = copypage(child, (void *)UXSTACKTOP - PAGE_SIZE);
+    if (res < 0) goto error;
 
     res = sys_env_set_pgfault_upcall(child, thisenv->env_pgfault_upcall);
     if (res < 0) goto error;

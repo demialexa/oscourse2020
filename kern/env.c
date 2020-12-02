@@ -187,7 +187,7 @@ region_alloc(struct Env *env, void *va, size_t len) {
     cprintf ("\tregion[%p;%p]\n", va, end - 1);
 
     while (va < end) {
-        struct PageInfo *pi = page_alloc(0);
+        struct PageInfo *pi = page_alloc(ALLOC_ZERO);
         if (!pi) return -E_NO_MEM;
         int res = page_insert(env->env_pagetable, pi, va, PTE_U | PTE_W);
         if (res < 0) return res;
@@ -445,22 +445,18 @@ bind_functions(struct Env *e, uint8_t *binary, size_t size, uintptr_t image_star
 }
 
 #ifdef SANITIZE_USER_SHADOW_BASE
-
 /* Map UVP shadow memory and create pages if necessary */
-struct PageInfo *uvpt_pages = NULL;
 void
 uvpt_shadow_map(struct Env *env) {
-    uintptr_t va = ROUNDDOWN((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE, PAGE_SIZE);
-    uintptr_t vend = ROUNDUP((uintptr_t)SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE, PAGE_SIZE);
-
-    for (struct PageInfo **link = &uvpt_pages; va < vend; va += PAGE_SIZE) {
-        if (!*link) *link = page_alloc(ALLOC_ZERO);
-
-        int res = page_insert(env->env_pagetable, *link, (void *)va, PTE_U | PTE_W);
-        if (res < 0) panic("Cannot allocate any memory for uvpt shadow mem");
-
-        link = &(*link)->pp_link;
+    static struct PageInfo *uvpt_page;
+    if (!uvpt_page) {
+        uvpt_page = page_alloc(ALLOC_ZERO);
+        if (!uvpt_page) panic("Cannot allocate memory for uvpt shadow mem");
     }
+
+    for (uintptr_t va = SANITIZE_USER_VPT_SHADOW_BASE; va < SANITIZE_USER_VPT_SHADOW_END; va += PAGE_SIZE)
+        if (page_insert(env->env_pagetable, uvpt_page, (void *)va, PTE_U | PTE_W) < 0)
+            panic("Cannot allocate any memory for uvpt shadow mem");
 }
 #endif
 
@@ -594,7 +590,6 @@ load_icode(struct Env *env, uint8_t *binary, size_t size) {
     if (res < 0) return res;
 
 #ifdef SANITIZE_USER_SHADOW_BASE
-    void uvpt_shadow_map(struct Env *e);
     uvpt_shadow_map(env);
     res = region_alloc(env, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
     if (res < 0) return res;

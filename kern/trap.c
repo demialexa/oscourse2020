@@ -321,7 +321,7 @@ page_fault_handler(struct Trapframe *tf) {
     // LAB 9: Your code here:
 
     struct UTrapframe *utf = (struct UTrapframe *)(curenv->env_tf.tf_rsp < UXSTACKTOP &&
-    UXSTACKTOP - curenv->env_tf.tf_rsp < UXSTACKSIZE ? curenv->env_tf.tf_rsp - sizeof(void *) : UXSTACKTOP) - 1;
+        UXSTACKTOP - curenv->env_tf.tf_rsp < UXSTACKSIZE ? curenv->env_tf.tf_rsp - sizeof(void *) : UXSTACKTOP) - 1;
 
     user_mem_assert(curenv, (uint8_t *)utf - sizeof(utf), sizeof(*utf) + sizeof(utf), PTE_U | PTE_W);
 

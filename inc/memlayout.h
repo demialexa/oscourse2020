@@ -147,9 +147,12 @@
  * Top of user VM. User can manipulate VA from UTOP-1 and down!
  */
 
+//#define USER_SHADOW_SIZE 0x3000000000
+
 /* Top of user-accessible VM */
 #define UTOP 0x8000000000
 /* Top of one-page user exception stack */
+//#define UXSTACKTOP (UTOP-USER_SHADOW_SIZE)
 #define UXSTACKTOP UTOP
 /* Size of exception stack (must be one page for now) */
 #define UXSTACKSIZE (4 * PAGE_SIZE)
@@ -164,7 +167,6 @@
 
 
 #ifdef SAN_ENABLE_KASAN
-
 /* (this *should* be defined as a literal number) */
 #define SANITIZE_SHADOW_BASE 0x8080000000
 /* SANITIZE_SHADOW_SIZE of 32 MB allows 256 MB of addressible memory (due to byte granularity). */
@@ -175,24 +177,30 @@
 #ifdef SAN_ENABLE_UASAN
 /* (this *should* be defined as a literal number) */
 #define SANITIZE_USER_SHADOW_BASE 0x21000000
+//#define SANITIZE_USER_SHADOW_BASE 0x5000000000
 #define SANITIZE_USER_SHADOW_SIZE 0x3000000
 #define SANITIZE_USER_SHADOW_OFF  SANITIZE_USER_SHADOW_BASE
+#define SANITIZE_USER_SHADOW_END  (SANITIZE_USER_SHADOW_BASE+SANITIZE_USER_SHADOW_SIZE)
 
 /* User stack and some other tables are located at higher addresses,
  * so we need to map a separate shadow for it. */
-#define SANITIZE_USER_EXTRA_SHADOW_BASE (((UENVS >> 3) + SANITIZE_USER_SHADOW_OFF) & ~(PAGE_SIZE - 1))
-#define SANITIZE_USER_EXTRA_SHADOW_SIZE ((ULIM - UENVS) >> 3)
+#define SANITIZE_USER_EXTRA_SHADOW_BASE ROUNDDOWN((uintptr_t)(UENVS >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_EXTRA_SHADOW_END ROUNDUP((uintptr_t)(ULIM >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_EXTRA_SHADOW_SIZE (SANITIZE_USER_EXTRA_SHADOW_END-SANITIZE_USER_EXTRA_SHADOW_BASE)
 
-#define SANITIZE_USER_STACK_SHADOW_BASE ((((USTACKTOP - USTACKSIZE) >> 3) + SANITIZE_USER_SHADOW_OFF) & ~(PAGE_SIZE - 1))
-#define SANITIZE_USER_STACK_SHADOW_SIZE ((USTACKSIZE + UXSTACKSIZE + PAGE_SIZE) >> 3)
+#define SANITIZE_USER_STACK_SHADOW_BASE ROUNDDOWN((uintptr_t)((USTACKTOP - USTACKSIZE) >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_STACK_SHADOW_END ROUNDUP((uintptr_t)((USTACKTOP + UXSTACKSIZE + PAGE_SIZE) >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_STACK_SHADOW_SIZE (SANITIZE_USER_STACK_SHADOW_END-SANITIZE_USER_STACK_SHADOW_BASE)
 
 /* File system is located at another specific address space */
-#define SANITIZE_USER_FS_SHADOW_BASE ((FILEVA >> 3) + SANITIZE_USER_SHADOW_OFF)
-#define SANITIZE_USER_FS_SHADOW_SIZE ((((MAXOPEN * PAGE_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
+#define SANITIZE_USER_FS_SHADOW_BASE ROUNDDOWN((uintptr_t)(FILEVA >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_FS_SHADOW_END ROUNDUP((uintptr_t)((FILEVA + MAXOPEN * PAGE_SIZE) >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_FS_SHADOW_SIZE (SANITIZE_USER_FS_SHADOW_END-SANITIZE_USER_FS_SHADOW_BASE)
 
 /* UVPT is located at another specific address space */
-#define SANITIZE_USER_VPT_SHADOW_BASE ((UVPT >> 3) + SANITIZE_USER_SHADOW_OFF)
-#define SANITIZE_USER_VPT_SHADOW_SIZE ((((UVPML4 - UVPT + PAGE_SIZE) >> 3) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1))
+#define SANITIZE_USER_VPT_SHADOW_BASE ROUNDDOWN((uintptr_t)(UVPT >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_VPT_SHADOW_END ROUNDUP((uintptr_t)((UVPML4 + 2*PAGE_SIZE) >> 3) + SANITIZE_USER_SHADOW_OFF, PAGE_SIZE)
+#define SANITIZE_USER_VPT_SHADOW_SIZE (SANITIZE_USER_VPT_SHADOW_END-SANITIZE_USER_VPT_SHADOW_BASE)
 #endif
 
 /* Where user programs generally begin */
@@ -250,16 +258,16 @@ struct PageInfo {
     struct PageInfo *pp_link;
 
     /* pp_ref is the count of pointers minus one (usually in page table entries)
-   * to this page, for pages allocated using page_alloc.
-   *
-   * Pages allocated at boot time using pmap.c's
-   * boot_alloc do not have valid reference count fields
-   *
-   * page_alloc sets pp_ref to 0 (i.e. 1 pointer)
-   * so code that allocates a page and then inserts
-   * it to the page table should call page_decref
-   * after useage (or page_free if there is exactly once pointer left)
-   */
+     * to this page, for pages allocated using page_alloc.
+     *
+     * Pages allocated at boot time using pmap.c's
+     * boot_alloc do not have valid reference count fields
+     *
+     * page_alloc sets pp_ref to 0 (i.e. 1 pointer)
+     * so code that allocates a page and then inserts
+     * it to the page table should call page_decref
+     * after useage (or page_free if there is exactly once pointer left)
+     */
 
     uint32_t pp_ref;
 };

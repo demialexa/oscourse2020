@@ -108,23 +108,6 @@ spawn(const char *prog, const char **argv) {
     struct Trapframe child_tf = envs[ENVX(child)].env_tf;
     child_tf.tf_rip = elf->e_entry;
 
-    void *prsp = &child_tf.tf_rsp;
-    if ((res = init_stack(child, argv, prsp)) < 0) goto error;
-
-    /* Set up program segments as defined in ELF header. */
-    struct Proghdr *ph = (struct Proghdr *)(elf_buf + elf->e_phoff);
-    for (size_t i = 0; i < elf->e_phnum; i++, ph++) {
-        if (ph->p_type != ELF_PROG_LOAD) continue;
-        int perm = PTE_P | PTE_U;
-
-        if (ph->p_flags & ELF_PROG_FLAG_WRITE)
-            perm |= PTE_W;
-
-        if ((res = map_segment(child, ph->p_va, ph->p_memsz,
-                             fd, ph->p_filesz, ph->p_offset, perm)) < 0)
-            goto error;
-      }
-
 #ifdef SANITIZE_USER_SHADOW_BASE
     res = map_segment(child, SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE, fd, 0, 0, PTE_P | PTE_U | PTE_W);
     if (res < 0) goto error;
@@ -142,6 +125,23 @@ spawn(const char *prog, const char **argv) {
         if (res < 0) goto error;
     }
 #endif
+
+    void *prsp = &child_tf.tf_rsp;
+    if ((res = init_stack(child, argv, prsp)) < 0) goto error;
+
+    /* Set up program segments as defined in ELF header. */
+    struct Proghdr *ph = (struct Proghdr *)(elf_buf + elf->e_phoff);
+    for (size_t i = 0; i < elf->e_phnum; i++, ph++) {
+        if (ph->p_type != ELF_PROG_LOAD) continue;
+        int perm = PTE_P | PTE_U;
+
+        if (ph->p_flags & ELF_PROG_FLAG_WRITE)
+            perm |= PTE_W;
+
+        if ((res = map_segment(child, ph->p_va, ph->p_memsz,
+                             fd, ph->p_filesz, ph->p_offset, perm)) < 0)
+            goto error;
+      }
 
     close(fd);
 

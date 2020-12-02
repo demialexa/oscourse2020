@@ -79,7 +79,7 @@ sys_page_map(envid_t srcenv, void *srcva, envid_t dstenv, void *dstva, int perm)
             uintptr_t addr = ((uintptr_t)dstva >> 3) + SANITIZE_USER_SHADOW_OFF;
             uintptr_t paddr = (uintptr_t)ROUNDDOWN(addr, PAGE_SIZE);
             uintptr_t pdst = (uintptr_t)PFTEMP - PAGE_SIZE;
-            res = syscall(SYS_page_map, 1, srcenv, paddr, CURENVID, pdst, PTE_UWP);
+            int res = syscall(SYS_page_map, 1, srcenv, paddr, CURENVID, pdst, PTE_UWP);
             // Ignore failures
             if (res >= 0) {
                 __nosan_memset((void *)pdst + (addr - paddr), 0, PAGE_SIZE/8);

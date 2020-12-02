@@ -73,10 +73,7 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
     // LAB 2: Your code here
 
-    uintptr_t cr3 = rcr3();
-    cprintf("%p %p %p\n", (void *)cr3, (void *)curenv->env_cr3, (void *)kern_cr3);
-
-    uintptr_t rip, *rbp;
+    uintptr_t cr3 = rcr3(), rip, *rbp;
 
     /* Read current address and current stack frame */
     rbp = (uintptr_t *)(tf ? tf->tf_regs.reg_rbp : read_rbp());

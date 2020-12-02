@@ -2,6 +2,7 @@
  * entry.S already took care of defining envs, pages, uvpd, and uvpt */
 
 #include <inc/lib.h>
+#include <inc/x86.h>
 
 extern void umain(int argc, char **argv);
 

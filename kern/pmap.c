@@ -1,15 +1,16 @@
 /* See COPYRIGHT for copyright information. */
 
-#include <inc/x86.h>
-#include <inc/mmu.h>
-#include <inc/error.h>
-#include <inc/string.h>
 #include <inc/assert.h>
-
-#include <kern/pmap.h>
-#include <kern/kclock.h>
-#include <kern/env.h>
+#include <inc/error.h>
+#include <inc/mmu.h>
+#include <inc/string.h>
 #include <inc/uefi.h>
+#include <inc/x86.h>
+
+#include <kern/env.h>
+#include <kern/kclock.h>
+#include <kern/monitor.h>
+#include <kern/pmap.h>
 
 #ifdef SANITIZE_SHADOW_BASE
 /* asan unpoison routine used for whitelisting regions. */
@@ -752,7 +753,7 @@ void
 user_mem_assert(struct Env *env, const void *va, size_t len, int perm) {
     if (user_mem_check(env, va, len, perm | PTE_U) < 0) {
         cprintf("[%08x] user_mem_check assertion failure for "
-                "va %016lx\n", env->env_id, (unsigned long)user_mem_check_addr);
+                "va=%016zx ip=%016zx\n", env->env_id, user_mem_check_addr, env->env_tf.tf_rip);
         env_destroy(env); /* may not return */
     }
 }

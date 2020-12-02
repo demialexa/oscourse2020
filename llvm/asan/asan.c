@@ -88,7 +88,7 @@ __asan_storeN(uptr addr, size_t sz) {
 
 #define SET_SHADOW_DECLARE(val)                          \
     void __asan_set_shadow_##val(uptr addr, size_t sz) { \
-        __real_memset((void *)addr, 0x##val, sz);        \
+        __nosan_memset((void *)addr, 0x##val, sz);       \
     }
 
 SET_SHADOW_DECLARE(00)
