@@ -10,7 +10,7 @@
 #define NCPU 1
 
 /* Used by x86 to find stack for interrupt */
-extern struct Taskstate cpu_ts; 
+extern struct Taskstate cpu_ts;
 
 extern char in_intr;
 extern bool in_clk_intr;

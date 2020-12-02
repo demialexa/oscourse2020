@@ -21,9 +21,9 @@ syscall(uintptr_t num, bool check, uintptr_t a1, uintptr_t a2, uintptr_t a3, uin
     * memory locations. */
 
     asm volatile("int %1\n"
-               : "=a"(ret)
-               : "i"(T_SYSCALL), "a"(num), "d"(a1), "c"(a2), "b"(a3), "D"(a4), "S"(a5)
-               : "cc", "memory");
+                 : "=a"(ret)
+                 : "i"(T_SYSCALL), "a"(num), "d"(a1), "c"(a2), "b"(a3), "D"(a4), "S"(a5)
+                 : "cc", "memory");
 
     if (check && ret > 0) {
         panic("syscall %zd returned %zd (> 0)", num, ret);
@@ -82,7 +82,7 @@ sys_page_map(envid_t srcenv, void *srcva, envid_t dstenv, void *dstva, int perm)
             int res = syscall(SYS_page_map, 1, srcenv, paddr, CURENVID, pdst, PTE_UWP);
             // Ignore failures
             if (res >= 0) {
-                __nosan_memset((void *)pdst + (addr - paddr), 0, PAGE_SIZE/8);
+                __nosan_memset((void *)pdst + (addr - paddr), 0, PAGE_SIZE / 8);
                 syscall(SYS_page_unmap, 1, CURENVID, pdst, 0, 0, 0);
             }
         }
@@ -126,4 +126,9 @@ sys_ipc_recv(void *dstva) {
     if (!res) platform_asan_unpoison(ROUNDDOWN(dstva, PAGE_SIZE), PAGE_SIZE);
 #endif
     return res;
+}
+
+int
+sys_gettime(void) {
+    return syscall(SYS_gettime, 0, 0, 0, 0, 0, 0);
 }

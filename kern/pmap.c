@@ -5,12 +5,14 @@
 #include <inc/mmu.h>
 #include <inc/string.h>
 #include <inc/uefi.h>
+#include <inc/vsyscall.h>
 #include <inc/x86.h>
 
 #include <kern/env.h>
 #include <kern/kclock.h>
 #include <kern/monitor.h>
 #include <kern/pmap.h>
+#include <kern/vsyscall.h>
 
 #ifdef SANITIZE_SHADOW_BASE
 /* asan unpoison routine used for whitelisting regions. */
@@ -24,6 +26,8 @@ extern uint64_t pml4phys;
 /* Amount of physical memory (in pages) */
 size_t npages;
 
+/* Virtual syscall space */
+volatile int *vsys;
 /* Kernel's initial page directory */
 pde_t *kern_pml4;
 /* Physical address of boot time page directory */
@@ -159,10 +163,10 @@ mem_init(void) {
     // panic("mem_init: This function is not finished\n");
 
     /* create initial page directory. */
-    pml4e_t *pml4e = boot_alloc(PAGE_SIZE);
-    memset(pml4e, 0, PAGE_SIZE);
-    kern_pml4 = pml4e;
-    kern_cr3 = PADDR(pml4e);
+    pml4e_t *pml4 = boot_alloc(PAGE_SIZE);
+    memset(pml4, 0, PAGE_SIZE);
+    kern_pml4 = pml4;
+    kern_cr3 = PADDR(pml4);
 
 
     /* Recursively insert PD in itself as a page table, to form
@@ -183,6 +187,12 @@ mem_init(void) {
     size_t pages_size = ROUNDUP(npages*sizeof(*pages), PAGE_SIZE);
     pages = boot_alloc(pages_size);
     memset(pages, 0, pages_size);
+
+    /* Make 'vsys' point to an array of size 'NVSYSCALLS' of int. */
+    // LAB 12: Your code here:
+    size_t vsys_size = ROUNDUP(NVSYSCALLS*sizeof(*vsys), PAGE_SIZE);
+    vsys = boot_alloc(vsys_size);
+    memset((void *)vsys, 0, vsys_size);
 
     /* Make 'envs' point to an array of size 'NENV' of 'struct Env'.*/
 
@@ -221,6 +231,14 @@ mem_init(void) {
      // LAB 8: Your code here
 
     boot_map_region(kern_pml4, UENVS, envs_size, PADDR(envs), PTE_U);
+
+    /* Map the 'vsys' array read-only by the user at linear address UVSYS
+     * (ie. perm = PTE_U | PTE_P).
+     * Permissions:
+     *    - the new image at UVSYS  -- kernel R, user R
+     *    - envs itself -- kernel RW, user NONE */
+    // LAB 12: Your code here
+    boot_map_region(kern_pml4, UVSYS, vsys_size, PADDR((void *)vsys), PTE_U);
 
     /* Use the physical memory that 'bootstack' refers to as the kernel
      * stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -937,6 +955,7 @@ check_kern_pml4(void) {
         case VPD(KSTACKTOP - 1):
         case VPD(UPAGES):
         case VPD(UENVS):
+            // LAB 12: Your code here
             assert(pgdir[i] & PTE_P);
             break;
         default:

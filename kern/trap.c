@@ -2,6 +2,7 @@
 #include <inc/x86.h>
 #include <inc/assert.h>
 #include <inc/string.h>
+#include <inc/vsyscall.h>
 
 #include <kern/pmap.h>
 #include <kern/trap.h>
@@ -13,6 +14,7 @@
 #include <kern/kclock.h>
 #include <kern/picirq.h>
 #include <kern/timer.h>
+#include <kern/vsyscall.h>
 
 static struct Taskstate ts;
 
@@ -202,10 +204,12 @@ trap_dispatch(struct Trapframe *tf) {
     case IRQ_OFFSET + IRQ_CLOCK:
         /* All timers are actually routed through this IRQ */
         timer_for_schedule->handle_interrupts();
+        /* Update current time */
+        vsys[VSYS_gettime] = gettime();
         sched_yield();
-    return;
+        return;
         /* Handle keyboard and serial interrupts. */
-        // LAB 11: Your code here:
+        // LAB 11: Your code here
     case IRQ_OFFSET + IRQ_KBD:
         kbd_intr();
         return;

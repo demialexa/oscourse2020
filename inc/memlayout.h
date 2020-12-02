@@ -3,6 +3,7 @@
 
 #ifndef __ASSEMBLER__
 #include <inc/types.h>
+#include <inc/vsyscall.h>
 #include <inc/mmu.h>
 #endif /* not __ASSEMBLER__ */
 
@@ -142,6 +143,9 @@
 
 /* Read-only copies of the global env structures */
 #define UENVS (UPAGES - HUGE_PAGE_SIZE)
+
+/* Virtual syscall page */
+#define UVSYS (UENVS-PAGE_SIZE)
 
 /*
  * Top of user VM. User can manipulate VA from UTOP-1 and down!

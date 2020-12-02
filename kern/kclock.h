@@ -57,6 +57,8 @@ uint8_t cmos_read8(uint8_t reg);
 void cmos_write8(uint8_t reg, uint8_t datum);
 uint16_t cmos_read16(uint8_t reg);
 
+int gettime(void);
+
 #define BCD2BIN(bcd) ((((bcd)&15) + ((bcd) >> 4) * 10))
 
 #endif // !JOS_KERN_KCLOCK_H
