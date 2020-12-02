@@ -8,7 +8,7 @@ ENTRY(_start)
 SECTIONS
 {
 	/* Load programs at this address: "." means the current address */
-	/* Note, UASAN shadow is loaded at 0xC000000 in GNUMakefile, keep them in sync */
+	/* Note, UASAN shadow is loaded at 0x21000000 in GNUMakefile, keep them in sync */
 	. = 0x800000;
 
 	.text : {
