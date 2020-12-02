@@ -134,11 +134,9 @@ i386_init(void) {
     (*ctor)();
     ctor++;
   }
-  // LAB 8?
+
   pic_init();
   rtc_init();
-  // LAB 8 end
-
 #ifdef SANITIZE_SHADOW_BASE
   kasan_mem_init();
 #endif
@@ -153,20 +151,6 @@ i386_init(void) {
   env_init();
   trap_init();
 
-  // deleted in LAB 5
-#if 0
-  pic_init();
-  rtc_init();
-
-  // LAB 4 task 3
-  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
-  // LAB done
-
-  clock_idt_init();
-#endif
-  // deleted in LAB 5 end
-
-
   // choose the timer used for scheduling: hpet or pit
   timers_schedule("hpet0");
   clock_idt_init();
@@ -179,14 +163,33 @@ i386_init(void) {
   ENV_CREATE_KERNEL_TYPE(prog_test4);
   ENV_CREATE_KERNEL_TYPE(prog_test5);
   ENV_CREATE_KERNEL_TYPE(prog_test6);
-#if defined(TEST)
-  // Don't touch -- used by grading script!
-  ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
-  // Touch all you want.
-  ENV_CREATE(user_hello, ENV_TYPE_USER);
-#endif // TEST*
 #endif
+
+#if defined(TEST)
+
+  // Don't touch -- used by grading script!
+
+  #define S(x) #x
+  #define SS(x) S(x)
+  cprintf("\n\nTEST: %s\n", SS(TEST));
+
+  cprintf("A Test called!\n\n");
+  ENV_CREATE(TEST, ENV_TYPE_USER);
+  cprintf("Lemme test it...\n");
+
+  #else
+  // Touch all you want.
+
+  #define S(x) #x
+  #define SS(x) S(x)
+  cprintf("\n\nTEST: %s\n", SS(TEST));
+
+  cprintf("Hey\n");
+  ENV_CREATE(user_hello, ENV_TYPE_USER);
+  cprintf("Im not running your tests for you today!\n");
+
+#endif // TEST*
 
   // Schedule and run the first user environment!
   sched_yield();

@@ -8,12 +8,13 @@
 
 .globl entry
 entry:
+  # LAB 4 code
+  # маскирование прерываний
+  cli
+  # LAB 4 code end
+
   # Save LoadParams in uefi_lp.
   movq %rcx, uefi_lp(%rip)
-
-  # LAB 4 taks 2
-  cli
-  # LAB 4 done
 
   # Set the stack pointer.
   leaq bootstacktop(%rip),%rsp
@@ -80,21 +81,21 @@ sys_yield:
   call csys_yield
   jmp .
 
-# LAB 3: Your code here.
 .globl sys_exit
 .type  sys_exit, @function
 sys_exit:
 
-  # LAB 4 task 2
+  # LAB 4 code
+  # маскирование прерываний
   cli
-  # LAB 4 done
+  # LAB 4 code end
 
-  # LAB 3
+  # LAB 3 code
   leaq bootstacktop(%rip),%rsp
   xor %ebp, %ebp
   call csys_exit
-  # LAB 3 done
-
+  # LAB 3 code end
+  
   jmp .
 #endif
 

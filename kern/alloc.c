@@ -29,52 +29,46 @@ check_list(void) {
 /* malloc: general-purpose storage allocator */
 void *
 test_alloc(uint8_t nbytes) {
+
   Header *p;
   unsigned nunits;
 
   // Make allocator thread-safe with the help of spin_lock/spin_unlock.
-  // LAB 5: Your code here.
+  // LAB 5 code
   spin_lock(&kernel_lock);
-  //LAB 5 end
+  // LAB 5 code end
 
   nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
 
   if (freep == NULL) { /* no free list yet */
-    cprintf("FIRST MEMORY ALLOCATION\n");
-    cprintf("space = %p\n", space);
     ((Header *)&space)->s.next = (Header *)&base;
     ((Header *)&space)->s.prev = (Header *)&base;
     ((Header *)&space)->s.size = (SPACE_SIZE - sizeof(Header)) / sizeof(Header);
     freep                      = &base;
-    cprintf("freep = %p\n", freep);
   }
 
   check_list();
 
   for (p = freep->s.next;; p = p->s.next) {
-    cprintf("MEMORY ALLOCATION ITERATION: nunits = %i\n", nunits);
-    cprintf("p = %p\n", p);
     if (p->s.size >= nunits) { /* big enough */
       freep = p->s.prev;
-      cprintf("freep = p->s.prev = %p\n", freep);
       if (p->s.size == nunits) { /* exactly */
         (p->s.prev)->s.next = p->s.next;
         (p->s.next)->s.prev = p->s.prev;
       } else { /* allocate tail end */
         p->s.size -= nunits;
-        cprintf("p->s.size = %i\n", p->s.size);
         p += p->s.size;
-        cprintf("p = %p\n", p);
         p->s.size = nunits;
       }
-      cprintf("MEMORY ALLOCATION END\n");
       spin_unlock(&kernel_lock);
       return (void *)(p + 1);
     }
     if (p == freep) { /* wrapped around free list */
-    // LAB 5: Your code here.
-    spin_unlock(&kernel_lock);
-    //LAB 5 end
+
+      // LAB 5 code
+      spin_unlock(&kernel_lock);
+      // LAB 5 code end
+
       return NULL;
     }
   }
@@ -87,9 +81,9 @@ test_free(void *ap) {
   bp = (Header *)ap - 1; /* point to block header */
 
   // Make allocator thread-safe with the help of spin_lock/spin_unlock.
-  // LAB 5: Your code here.
+  // LAB 5 code
   spin_lock(&kernel_lock);
-  //LAB 5 end
+  // LAB 5 code end
 
   for (p = freep; !(bp > p && bp < p->s.next); p = p->s.next)
     if (p >= p->s.next && (bp > p || bp < p->s.next))
@@ -114,8 +108,9 @@ test_free(void *ap) {
   }
   freep = p;
 
-  //LAB 5
-  spin_unlock(&kernel_lock);
-  //LAB 5 end
   check_list();
+
+  // LAB 5 code
+  spin_unlock(&kernel_lock);
+  // LAB 5 code end
 }

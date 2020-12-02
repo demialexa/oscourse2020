@@ -69,7 +69,7 @@ trapname(int trapno) {
 void
 trap_init(void) {
   // extern struct Segdesc gdt[];
-  // LAB 8: Your code here.
+  // LAB 8 code
   extern void (*divide_thdlr)(void);
 	extern void (*debug_thdlr)(void);
 	extern void (*nmi_thdlr)(void);
@@ -85,6 +85,8 @@ trap_init(void) {
 	extern void (*pgflt_thdlr)(void);
 	extern void (*fperr_thdlr)(void);
 
+  
+    
   extern void (*syscall_thdlr)(void);
 
 	SETGATE(idt[T_DIVIDE], 0, GD_KT, (uint64_t) &divide_thdlr, 0);
@@ -101,10 +103,9 @@ trap_init(void) {
 	SETGATE(idt[T_GPFLT], 0, GD_KT, (uint64_t) &gpflt_thdlr, 0);
 	SETGATE(idt[T_PGFLT], 0, GD_KT, (uint64_t) &pgflt_thdlr, 0);
 	SETGATE(idt[T_FPERR], 0, GD_KT, (uint64_t) &fperr_thdlr, 0);
-
+    
   SETGATE(idt[T_SYSCALL], 0, GD_KT, (uint64_t) &syscall_thdlr, 3);
-
-  // LAB 8 end
+  // LAB 8 code
 
   // Per-CPU setup
   trap_init_percpu();
@@ -202,6 +203,7 @@ trap_dispatch(struct Trapframe *tf) {
     a5                  = tf->tf_regs.reg_rsi;
     ret                 = syscall(syscallno, a1, a2, a3, a4, a5);
     tf->tf_regs.reg_rax = ret;
+    print_trapframe(tf);
     return;
   }
 
@@ -222,21 +224,24 @@ trap_dispatch(struct Trapframe *tf) {
   //
   if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
     cprintf("Spurious interrupt on irq 7\n");
-    print_trapframe(tf);
     return;
   }
 
   // All timers are actually routed through this IRQ.
   if (tf->tf_trapno == IRQ_OFFSET + IRQ_CLOCK) {
-  // deleted in LAB 5
-#if 0
-  // LAB 4 task 4
-    rtc_check_status();
-    pic_send_eoi(IRQ_CLOCK);
-  // LAB 4 done
-#endif
-  // deleted in LAB 5 end
+
+    // LAB 4 code
+    // было изначально
+    // rtc_check_status();
+    // pic_send_eoi(IRQ_CLOCK);
+
+    // читаем регистр статуса RTC и отправляем сигнал EOI на контроллер прерываний, 
+    // сигнализируя об окончании обработки прерывания
+    // pic_send_eoi(rtc_check_status());
+    // LAB 4 code end
+
     timer_for_schedule->handle_interrupts();
+
     sched_yield();
     return;
   }
@@ -269,6 +274,8 @@ trap(struct Trapframe *tf) {
   if (debug) {
     cprintf("Incoming TRAP frame at %p\n", tf);
   }
+
+  // cprintf("%ld", tf->tf_trapno);
 
   assert(curenv);
 
@@ -311,7 +318,7 @@ page_fault_handler(struct Trapframe *tf) {
 
   // Handle kernel-mode page faults.
 
-  // LAB 8: Your code here.
+  // LAB 8 code
   if (!(tf->tf_cs & 3)) {
 		panic("page fault in kernel!");
 	}
@@ -324,8 +331,7 @@ page_fault_handler(struct Trapframe *tf) {
 		curenv->env_id, fault_va, tf->tf_rip);
 	print_trapframe(tf);
 	env_destroy(curenv);
-
-  // LAB 8 end
-
+  
+  // LAB 8 code end
 
 }
