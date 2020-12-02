@@ -27,7 +27,7 @@ d_to_s(int d) {
 inline int
 timestamp(struct tm *time) {
     int result = 0, year, month;
-    for (year = 1970; year < time->tm_year + 2000; year++) {
+    for (year = 1970; year < time->tm_year + 1900; year++) {
         result += d_to_s(365 + is_leap_year(year));
     }
     int months[] = {31, 28 + is_leap_year(year), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -94,7 +94,7 @@ snprint_datetime(char *buf, int size, struct tm *tm) {
     assert(size >= 10 + 1 + 8 + 1);
     snprintf(buf, size,
              "%04d-%02d-%02d %02d:%02d:%02d",
-             tm->tm_year + 1900, tm->tm_mon, tm->tm_mday,
+             tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
              tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
 

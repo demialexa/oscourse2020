@@ -50,12 +50,38 @@ static int
 get_time(void) {
     struct tm time;
 
-    time.tm_sec = BCD2BIN(cmos_read8(RTC_SEC));
-    time.tm_min = BCD2BIN(cmos_read8(RTC_MIN));
-    time.tm_hour = BCD2BIN(cmos_read8(RTC_HOUR));
-    time.tm_mday = BCD2BIN(cmos_read8(RTC_DAY));
-    time.tm_mon = BCD2BIN(cmos_read8(RTC_MON));
-    time.tm_year = BCD2BIN(cmos_read8(RTC_YEAR));
+    uint8_t s, m, h, d, M, y, Y, state;
+    s = cmos_read8(RTC_SEC);
+    m = cmos_read8(RTC_MIN);
+    h = cmos_read8(RTC_HOUR);
+    d = cmos_read8(RTC_DAY);
+    M = cmos_read8(RTC_MON);
+    y = cmos_read8(RTC_YEAR);
+    Y = cmos_read8(RTC_YEAR_HIGH);
+    state = cmos_read8(RTC_BREG);
+
+    if (state & RTC_12H) {
+        /* Fixup 12 hour mode */
+        h = (h & 0x7F) + 12 * !!(h & 0x80);
+    }
+
+    if (!(state & RTC_BINARY)) {
+        /* Fixup binary mode */
+        s = BCD2BIN(s);
+        m = BCD2BIN(m);
+        h = BCD2BIN(h);
+        d = BCD2BIN(d);
+        M = BCD2BIN(M);
+        y = BCD2BIN(y);
+        Y = BCD2BIN(Y);
+    }
+
+    time.tm_sec = s;
+    time.tm_min = m;
+    time.tm_hour = h;
+    time.tm_mday = d;
+    time.tm_mon = M - 1;
+    time.tm_year = y + Y * 100 - 1900;
 
     return timestamp(&time);
 }
