@@ -14,17 +14,17 @@ struct tm {
     int tm_year; /* Year - 1900.  */
 };
 
-inline bool
+inline static bool
 is_leap_year(int year) {
     return (year % 400 == 0) || (year % 4 == 0 && year % 100 != 0);
 }
 
-inline int
+inline static int
 d_to_s(int d) {
     return d * 24 * 60 * 60;
 }
 
-inline int
+inline static int
 timestamp(struct tm *time) {
     int result = 0, year, month;
     for (year = 1970; year < time->tm_year + 1900; year++) {
@@ -38,7 +38,7 @@ timestamp(struct tm *time) {
     return result;
 }
 
-inline void
+inline static void
 mktime(int time, struct tm *tm) {
     int year = 70;
     int month = 0;
@@ -82,14 +82,14 @@ mktime(int time, struct tm *tm) {
     tm->tm_sec = time;
 }
 
-inline void
+inline static void
 print_datetime(struct tm *tm) {
     cprintf("%04d-%02d-%02d %02d:%02d:%02d\n",
             tm->tm_year + 1900, tm->tm_mon, tm->tm_mday,
             tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
 
-inline void
+inline static void
 snprint_datetime(char *buf, int size, struct tm *tm) {
     assert(size >= 10 + 1 + 8 + 1);
     snprintf(buf, size,
