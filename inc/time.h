@@ -25,7 +25,7 @@ struct tm {
 inline static int
 timestamp(struct tm *time) {
     return DAY*(Y2DAYS(time->tm_year + 1900) - Y2DAYS(1970) +
-                M2DAYS(time->tm_mon, time->tm_year + 1900) + time->tm_mday) +
+                M2DAYS(time->tm_mon, time->tm_year + 1900) + time->tm_mday - 1) +
            time->tm_hour * HOUR + time->tm_min * MINUTE + time->tm_sec;
 }
 
@@ -43,7 +43,7 @@ mktime(int time, struct tm *tm) {
     tm->tm_mon = month;
     time -= DAY * M2DAYS(month, year);
 
-    tm->tm_mday = time/DAY;
+    tm->tm_mday = time/DAY + 1;
     time %= DAY;
     tm->tm_hour = time/HOUR;
     time %= HOUR;
