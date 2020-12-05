@@ -55,17 +55,18 @@ TOP = .
 ifdef JOSLLVM
 
 CC	:= clang -target x86_64-gnu-linux -pipe
-AS	:= as
-AR	:= ar
+AS	:= llvm-as
+AR	:= llvm-ar
 LD	:= ld.lld
-OBJCOPY	:= objcopy
-OBJDUMP	:= objdump
-NM	:= nm
+OBJCOPY	:= llvm/gnu-objcopy
+OBJDUMP	:= llvm-objdump
+NM	:= llvm-nm
 
 EXTRA_CFLAGS += -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member \
                 -Wno-frame-address -Wno-unknown-warning-option
 
-GCC_LIB := $(shell $(CC) $(CFLAGS) -print-resource-dir)/lib/linux/libclang_rt.builtins-x86_64.a
+
+GCC_LIB := $(shell A="$$($(CC) $(CFLAGS) -print-resource-dir)/lib"; [ -d "$$A/linux" ] && echo "$$A/linux" || echo "$$A/jetos")/libclang_rt.builtins-x86_64.a
 
 else
 
