@@ -117,10 +117,11 @@
 #define KSTKGAP   (8 * PAGE_SIZE)  /* size of a kernel stack guard */
 
 /* Memory-mapped IO */
-#define MMIOLIM  (KSTACKTOP - HUGE_PAGE_SIZE)
+#define MMIOLIM (KSTACKTOP - HUGE_PAGE_SIZE)
 #define MMIOBASE (MMIOLIM - HUGE_PAGE_SIZE)
 
 /* Memory-mapped FrameBuffer */
+#define FBUFF_SIZE 0x1000000
 #define FBUFFBASE (MMIOBASE - FBUFF_SIZE)
 
 #define ULIM (FBUFFBASE)
@@ -132,20 +133,23 @@
 
 /* User read-only virtual page table (see 'uvpt' below) */
 #define UVPT_INDEX 2ULL
-#define UVPT       (UVPT_INDEX << PML4_SHIFT)
-#define UVPD       (UVPT + (UVPT_INDEX << PDP_SHIFT))
-#define UVPDP      (UVPD + (UVPT_INDEX << PD_SHIFT))
-#define UVPML4     (UVPDP + (UVPT_INDEX << PT_SHIFT))
+#define UVPT (UVPT_INDEX << PML4_SHIFT)
+#define UVPD (UVPT + (UVPT_INDEX << PDP_SHIFT))
+#define UVPDP (UVPD + (UVPT_INDEX << PD_SHIFT))
+#define UVPML4 (UVPDP + (UVPT_INDEX << PT_SHIFT))
 
-/* Read-only copies of the Page structures (sizeof == 400 * HUGE_PAGE_SIZE so that all
- * struct PageInfo of up to 512GiB pages can fit here). */
+/* Read-only copies of the Page structures (size is 20 * HUGE_PAGE_SIZE so that all
+ * struct PageInfo of up to 10GiB pages can fit here). */
+#define UPAGES_SIZE (20*HUGE_PAGE_SIZE)
 #define UPAGES (ULIM - UPAGES_SIZE)
 
 /* Read-only copies of the global env structures */
-#define UENVS (UPAGES - HUGE_PAGE_SIZE)
+#define UENVS_SIZE HUGE_PAGE_SIZE
+#define UENVS (UPAGES - UENVS_SIZE)
 
 /* Virtual syscall page */
-#define UVSYS (UENVS-PAGE_SIZE)
+#define UVSYS_SIZE PAGE_SIZE
+#define UVSYS (UENVS - UVSYS_SIZE)
 
 /*
  * Top of user VM. User can manipulate VA from UTOP-1 and down!

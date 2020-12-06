@@ -35,19 +35,6 @@ endif
 -include conf/lab.mk
 -include conf/env.mk
 
-# Give UPAGES 20 PTSIZE
-UPAGES_SIZE=$$(( 20*4096*512 ))
-
-# Give FBUFF up to 1080p. For KSPACE mode we also
-# need to align this value for 2MB pages as the
-# mapping done in map_addr_early_boot cannot use
-# 4K pages.
-ifeq ($(shell test $(LAB) -le 6; echo $$?),0)
-FBUFF_SIZE=0x1000000
-else
-FBUFF_SIZE=0xFD2000
-endif
-
 LABSETUP ?= ./
 
 TOP = .
@@ -151,7 +138,6 @@ CFLAGS += -Wall -Wformat=2 -Wno-unused-function -Werror -g -gpubnames
 
 # Add -fno-stack-protector if the option exists.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
-CFLAGS += -DUPAGES_SIZE=$(UPAGES_SIZE)  -DFBUFF_SIZE=$(FBUFF_SIZE)
 CFLAGS += $(EXTRA_CFLAGS)
 CFLAGS += -mno-sse -mno-sse2 -mno-mmx
 
