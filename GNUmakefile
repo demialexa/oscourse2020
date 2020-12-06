@@ -107,8 +107,6 @@ PERL	:= perl
 ifndef QEMU
 QEMU := $(shell if which qemu-system-x86_64 > /dev/null 2>&1; \
 	then echo qemu-system-x86_64; exit; \
-	elif which qemu-system-x86_64 > /dev/null 2>&1; \
-	then echo qemu-system-x86_64; exit; \
 	else \
 	qemu=/Applications/Q.app/Contents/MacOS/x86_64-softmmu.app/Contents/MacOS/x86_64-softmmu; \
 	if test -x $$qemu; then echo $$qemu; exit; fi; fi; \
