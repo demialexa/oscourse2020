@@ -209,7 +209,6 @@ timer_start(const char *name) {
         }
     }
 
-    cprintf("Timer Error\n");
     cprintf("Timer %s does not exist\n", name);
 }
 
@@ -235,6 +234,5 @@ timer_cpu_frequency(const char *name) {
         }
     }
 
-    cprintf("Timer Error\n");
     cprintf("Timer %s does not exist\n", name);
 }

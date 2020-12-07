@@ -267,7 +267,7 @@ hpet_enable_interrupts_tim0(void) {
     hpetReg->TIM0_COMP = hpet_get_main_cnt() + Peta/2/hpetFemto;
     hpetReg->TIM0_COMP = Peta/2/hpetFemto;
 
-    irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_TIMER));
+    pic_irq_unmask(IRQ_TIMER);
 }
 
 void
@@ -284,7 +284,7 @@ hpet_enable_interrupts_tim1(void) {
     hpetReg->TIM1_COMP = hpet_get_main_cnt() + 3*Peta/2/hpetFemto;
     hpetReg->TIM1_COMP = 3*Peta/2/hpetFemto;
 
-    irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
+    pic_irq_unmask(IRQ_CLOCK);
 }
 
 void

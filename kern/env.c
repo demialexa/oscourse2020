@@ -757,6 +757,7 @@ env_free(struct Env *env) {
 
     /* Free the page directory pointer */
     page_decref(pa2page(PTE_ADDR(env->env_pagetable[0])));
+    page_decref(pa2page(PTE_ADDR(env->env_pagetable[1])));
 
     /* Free the page map level 4 (PML4) */
     physaddr_t pa = env->env_cr3;

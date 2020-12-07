@@ -1,14 +1,15 @@
 /* See COPYRIGHT for copyright information. */
 
-#include <inc/x86.h>
-#include <inc/memlayout.h>
-#include <inc/kbdreg.h>
-#include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/kbdreg.h>
+#include <inc/memlayout.h>
+#include <inc/string.h>
+#include <inc/trap.h>
+#include <inc/uefi.h>
+#include <inc/x86.h>
 
 #include <kern/console.h>
 #include <kern/picirq.h>
-#include <inc/uefi.h>
 #include <kern/pmap.h>
 
 #define COM1 0x3F8
@@ -312,9 +313,8 @@ serial_init(void) {
     (void)inb(COM1 + COM_IIR);
     (void)inb(COM1 + COM_RX);
 
-    // Enable serial interrupts
-    if (serial_exists)
-        irq_setmask_8259A(irq_mask_8259A & ~(1 << 4));
+    /* Enable serial interrupts */
+    if (serial_exists) pic_irq_unmask(IRQ_SERIAL);
 }
 
 /* Parallel port output code */
@@ -485,7 +485,7 @@ static void
 kbd_init(void) {
     /* Drain the kbd buffer so that Bochs generates interrupts. */
     kbd_intr();
-    irq_setmask_8259A(irq_mask_8259A & ~(1 << 1));
+    pic_irq_unmask(IRQ_KBD);
 }
 
 /* General device-independent console code

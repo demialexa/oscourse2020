@@ -31,11 +31,10 @@
 #include <inc/types.h>
 #include <inc/x86.h>
 
-extern uint16_t irq_mask_8259A;
-
 void pic_init(void);
-void irq_setmask_8259A(uint16_t mask);
 void pic_send_eoi(uint8_t irq);
+void pic_irq_mask(uint8_t mask);
+void pic_irq_unmask(uint8_t mask);
 
 #endif // !__ASSEMBLER__
 

@@ -74,6 +74,8 @@ load_user_dwarf_info(struct Dwarf_Addrs *addrs) {
  */
 int
 debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
+    if (!addr) return 0;
+
     /* Initialize *info */
     strcpy(info->rip_file, UNKNOWN);
     strcpy(info->rip_fn_name, UNKNOWN);
@@ -81,8 +83,6 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
     info->rip_line = 0;
     info->rip_fn_addr = addr;
     info->rip_fn_narg = 0;
-
-    if (!addr) return 0;
 
     /* Temporarily load kernel cr3 and return back once done.
     * Make sure that you fully understand why it is necessary. */
@@ -92,7 +92,6 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
     // LAB 8: Your code here:
 
     struct Dwarf_Addrs addrs;
-
     (addr < ULIM ? load_user_dwarf_info : load_kernel_dwarf_info)(&addrs);
 
     Dwarf_Off offset = 0, line_offset = 0;
@@ -100,7 +99,6 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
     if (res < 0) goto error;
 
     char *tmp_buf = NULL;
-
     res = file_name_by_info(&addrs, offset, &tmp_buf, &line_offset);
     if (res < 0) goto error;
     strncpy(info->rip_file, tmp_buf, sizeof(info->rip_file));
@@ -112,12 +110,10 @@ debuginfo_rip(uintptr_t addr, struct Ripdebuginfo *info) {
 
     // LAB 2: Your res here:
 
-    addr -= CALL_INSN_LEN;
-
-    res = line_for_address(&addrs, addr, line_offset, &info->rip_line);
+    res = line_for_address(&addrs, addr - CALL_INSN_LEN, line_offset, &info->rip_line);
     if (res < 0) goto error;
 
-    res = function_by_info(&addrs, addr, offset, &tmp_buf, &info->rip_fn_addr);
+    res = function_by_info(&addrs, addr - CALL_INSN_LEN, offset, &tmp_buf, &info->rip_fn_addr);
     if (res < 0) goto error;
     strncpy(info->rip_fn_name, tmp_buf, sizeof(info->rip_fn_name));
     info->rip_fn_namelen = strnlen(info->rip_fn_name, sizeof(info->rip_fn_name));

@@ -30,7 +30,7 @@ cmos_read16(uint8_t reg) {
 
 static void
 rtc_timer_pic_interrupt(void) {
-    irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
+    pic_irq_unmask(IRQ_CLOCK);
 }
 
 static void
