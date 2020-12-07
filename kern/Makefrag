@@ -9,12 +9,10 @@ OBJDIRS += kern
 
 KERN_LDFLAGS := $(LDFLAGS) -T kern/kernel.ld -nostdlib
 
-# entry.S must be first, so that it's the first code in the text segment!!!
-#
-# We also snatch the use of a couple handy source files
+# We snatch the use of a couple handy source files
 # from the lib directory, to avoid gratuitous code duplication.
-KERN_SRCFILES :=	kern/entry.S \
-			kern/bootstrap.S \
+KERN_SRCFILES := kern/bootstrap.S \
+			kern/entry.S \
 			kern/init.c \
 			kern/console.c \
 			kern/dwarf.c \
