@@ -17,6 +17,8 @@ struct Timer timer_pit = {
     .get_cpu_freq = tsc_calibrate
 };
 
+/* Theres more commands but they are not used */
+
 /*
  * This reads the current MSB of the PIT counter, and
  * checks if we are running on sufficiently fast and
@@ -55,8 +57,8 @@ struct Timer timer_pit = {
 static inline int
 pit_verify_msb(unsigned char val) {
     /* Ignore LSB */
-    inb(0x42);
-    return inb(0x42) == val;
+    inb(PIT_IO_CHANNEL_2);
+    return inb(PIT_IO_CHANNEL_2) == val;
 }
 
 static inline int
@@ -101,21 +103,21 @@ quick_pit_calibrate(void) {
      * final output frequency as a decrement-by-one),
      * so mode 0 is much better when looking at the
      * individual counts */
-    outb(0x43, 0xb0);
+    outb(PIT_IO_CMD, PIT_CMD_CHANNEL_2 | PIT_ACC_LOHI);
 
     /* Start at 0xffff */
-    outb(0x42, 0xff);
-    outb(0x42, 0xff);
+    outb(PIT_IO_CHANNEL_2, 0xFF);
+    outb(PIT_IO_CHANNEL_2, 0xFF);
 
     /* The PIT starts counting at the next edge, so we
      * need to delay for a microsecond. The easiest way
      * to do that is to just read back the 16-bit counter
      * once from the PIT */
     pit_verify_msb(0);
-    if (pit_expect_msb(0xff, &tsc, &d1)) {
+    if (pit_expect_msb(0xFF, &tsc, &d1)) {
         for (i = 1; i <= MAX_QUICK_PIT_ITERATIONS; i++) {
 
-            if (!pit_expect_msb(0xff - i, &delta, &d2)) break;
+            if (!pit_expect_msb(0xFF - i, &delta, &d2)) break;
 
             /* Iterate until the error is less than 500 ppm */
             delta -= tsc;
@@ -128,7 +130,7 @@ quick_pit_calibrate(void) {
              * This also guarantees serialization of the
              * last cycle read ('d2') in pit_expect_msb.
              */
-            if (!pit_verify_msb(0xfe - i)) break;
+            if (!pit_verify_msb(0xFE - i)) break;
 
             goto success;
         }
