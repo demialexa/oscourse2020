@@ -42,12 +42,12 @@ TOP = .
 ifdef JOSLLVM
 
 CC	:= clang -target x86_64-gnu-linux -pipe
-AS	:= llvm-as
-AR	:= llvm-ar
+AS	:= $(shell command -v llvm-as >/dev/null 2>&1 && echo llvm-as || echo as)
+AR	:= $(shell command -v llvm-ar >/dev/null 2>&1 && echo llvm-ar || echo ar)
 LD	:= ld.lld
-OBJCOPY	:= llvm/gnu-objcopy
-OBJDUMP	:= llvm-objdump
-NM	:= llvm-nm
+OBJCOPY	:= $(shell command -v llvm-objcopy >/dev/null 2>&1 && echo llvm/gnu-objcopy || echo objcopy)
+OBJDUMP	:= $(shell command -v llvm-objdump >/dev/null 2>&1 && echo llvm-objdump || echo objdump)
+NM	:= $(shell command -v llvm-nm >/dev/null 2>&1 && echo llvm-nm || echo nm)
 
 EXTRA_CFLAGS += -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member \
                 -Wno-frame-address -Wno-unknown-warning-option
