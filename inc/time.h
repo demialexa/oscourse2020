@@ -34,12 +34,12 @@ mktime(int time, struct tm *tm) {
     // TODO Support negative timestamps
 
     int year = 1970 + (time/(DAY*366 + 1));
-    while (time >= DAY*(1 + Y2DAYS(year + 1)-Y2DAYS(1970))) year++;
+    while (time >= DAY*(Y2DAYS(year + 1)-Y2DAYS(1970))) year++;
     tm->tm_year = year - 1900;
     time -= DAY * (Y2DAYS(year)-Y2DAYS(1970));
 
     int month = time/(DAY*32);
-    while (time >= DAY*(1 + M2DAYS(month + 1, year))) month++;
+    while (time >= DAY*(M2DAYS(month + 1, year))) month++;
     tm->tm_mon = month;
     time -= DAY * M2DAYS(month, year);
 
